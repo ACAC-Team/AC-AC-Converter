@@ -40,7 +40,7 @@ typedef enum
  */
 #ifndef PFC_CONTROL_RUN_MODE
 #define PFC_CONTROL_RUN_MODE \
-PFC_CONTROL_MODE_CURRENT_LOOP
+PFC_CONTROL_MODE_PFC
 #endif
 
 /**
@@ -48,14 +48,14 @@ PFC_CONTROL_MODE_CURRENT_LOOP
  *
  * @note Timer E下管S2由HRTIM死区模块产生互补波。
  */
-#define PFC_EF_FIXED_TIMER_E_DUTY 0.00f
+#define PFC_EF_FIXED_TIMER_E_DUTY 0.50f
 
 /**
  * EF固定模式下Timer F上管S3的默认占空比。
  *
  * @note Timer F下管S4由HRTIM死区模块产生互补波。
  */
-#define PFC_EF_FIXED_TIMER_F_DUTY 1.00f
+#define PFC_EF_FIXED_TIMER_F_DUTY 0.50f
 
 /**
  * 单电流环模式的默认输入电流有效值给定，单位为A RMS。
@@ -77,10 +77,10 @@ PFC_CONTROL_MODE_CURRENT_LOOP
  *
  * @note 用于把电流有效值给定换算为与输入电压同相的瞬时电流给定。
  */
-#define PFC_INPUT_RMS_V 24.0f
+#define PFC_INPUT_RMS_V 36.0f
 
 /** 正常PFC模式的直流母线目标电压，单位为V。 */
-#define PFC_BUS_TARGET_V 40.0f
+#define PFC_BUS_TARGET_V 50.0f
 
 /** 正常PFC模式的母线参考电压软启动斜率，单位为V/s。 */
 #define PFC_BUS_REF_SLEW_V_PER_S 0.5f
@@ -101,24 +101,24 @@ PFC_CONTROL_MODE_CURRENT_LOOP
 #define PFC_VOLTAGE_LOOP_DIVIDER 1U
 
 /** 直流母线电压PI控制器比例增益。 */
-#define PFC_BUS_PI_KP 0.06f
+#define PFC_BUS_PI_KP 0.1f
 
 /** 直流母线电压PI控制器积分增益。 */
 #define PFC_BUS_PI_KI 20.0f
 
 /** 电压环和单电流环允许的最大电流有效值给定，单位为A RMS。 */
-#define PFC_CURRENT_REF_MAX_RMS_A 1.0f
+#define PFC_CURRENT_REF_MAX_RMS_A 0.5f
 
 /* ==================== 输入电流PR内环参数 ==================== */
 
 /** 输入电流PR控制器比例增益。 */
-#define PFC_CURRENT_PR_KP 5.0f
+#define PFC_CURRENT_PR_KP 3.0f
 
 /** 输入电流PR控制器谐振增益。 */
-#define PFC_CURRENT_PR_KR 20.0f
+#define PFC_CURRENT_PR_KR 15.0f
 
 /** 输入电流PR控制器谐振带宽，单位为rad/s。 */
-#define PFC_CURRENT_PR_WC_RAD_S 20.0f
+#define PFC_CURRENT_PR_WC_RAD_S 5.0f
 
 /** 输入电流PR控制器输出电压绝对值上限，单位为V。 */
 #define PFC_CURRENT_PR_OUTPUT_LIMIT_V 4.0f
