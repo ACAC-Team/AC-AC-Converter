@@ -80,7 +80,7 @@ PFC_CONTROL_MODE_PFC
 #define PFC_INPUT_RMS_V 36.0f
 
 /** 正常PFC模式的直流母线目标电压，单位为V。 */
-#define PFC_BUS_TARGET_V 50.0f
+#define PFC_BUS_TARGET_V 40.0f
 
 /** 正常PFC模式的母线参考电压软启动斜率，单位为V/s。 */
 #define PFC_BUS_REF_SLEW_V_PER_S 0.5f
