@@ -78,13 +78,13 @@ PFC_CONTROL_MODE_PFC
  *
  * @note 用于把电流有效值给定换算为与输入电压同相的瞬时电流给定。
  */
-#define PFC_INPUT_RMS_V 12.0f
+#define PFC_INPUT_RMS_V 35.0f
 
 /** 正常PFC模式的直流母线目标电压，单位为V。 */
-#define PFC_BUS_TARGET_V  20.0f
+#define PFC_BUS_TARGET_V  60.0f
 
 /** 正常PFC模式的母线参考电压软启动斜率，单位为V/s。 */
-#define PFC_BUS_REF_SLEW_V_PER_S 0.25f
+#define PFC_BUS_REF_SLEW_V_PER_S 0.5f
 
 
 /** 允许计算调制度的最低母线电压，单位为V。 */
@@ -103,18 +103,18 @@ PFC_CONTROL_MODE_PFC
 #define PFC_VOLTAGE_LOOP_DIVIDER 1U
 
 /** 直流母线电压PI控制器比例增益。 */
-#define PFC_BUS_PI_KP 0.2f
+#define PFC_BUS_PI_KP 1.5f
 
 /** 直流母线电压PI控制器积分增益。 */
-#define PFC_BUS_PI_KI 20.0f
+#define PFC_BUS_PI_KI 10.0f
 
 /** 电压环和单电流环允许的最大电流有效值给定，单位为A RMS。 */
-#define PFC_CURRENT_REF_MAX_RMS_A 0.5f
+#define PFC_CURRENT_REF_MAX_RMS_A 2.5f
 
 /* ==================== 输入电流PR内环参数 ==================== */
 
 /** 输入电流PR控制器比例增益。 */
-#define PFC_CURRENT_PR_KP 3.0f
+#define PFC_CURRENT_PR_KP 2.5f
 
 /** 输入电流PR控制器谐振增益。 */
 #define PFC_CURRENT_PR_KR 15.0f
@@ -123,7 +123,7 @@ PFC_CONTROL_MODE_PFC
 #define PFC_CURRENT_PR_WC_RAD_S 5.0f
 
 /** 输入电流PR控制器输出电压绝对值上限，单位为V。 */
-#define PFC_CURRENT_PR_OUTPUT_LIMIT_V 3.5f
+#define PFC_CURRENT_PR_OUTPUT_LIMIT_V 12.0f
 
 /**
  * PFC归一化调制度绝对值上限。

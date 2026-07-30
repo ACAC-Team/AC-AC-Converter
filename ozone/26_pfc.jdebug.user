@@ -1,7 +1,6 @@
 
 
 
-
 Breakpoint=D:/26_pfc/User/pfc_adc/pfc_adc.c:103:1, State=BP_STATE_DISABLED
 Breakpoint=D:/26_pfc/User/pfc_adc_watchdog/pfc_adc_watchdog.c:122:30, State=BP_STATE_DISABLED
 OpenDocument="stm32g4xx_hal.c", FilePath="D:/26_pfc/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal.c", Line=398
@@ -18,16 +17,18 @@ OpenDocument="pfc_adc.h", FilePath="D:/26_pfc/User/pfc_adc/pfc_adc.h", Line=0
 OpenDocument="stm32g4xx_it.c", FilePath="D:/26_pfc/Core/Src/stm32g4xx_it.c", Line=77
 OpenToolbar="Debug", Floating=0, x=0, y=0
 OpenWindow="Disassembly", DockArea=RIGHT, x=0, y=0, w=514, h=950, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0
+OpenWindow="Watched Data 1", DockArea=FLOATING, x=586, y=235, w=1148, h=664, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0
 OpenWindow="Functions", DockArea=LEFT, x=0, y=0, w=591, h=950, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0
 OpenWindow="Data Sampling", DockArea=BOTTOM, x=0, y=0, w=2288, h=323, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0, VisibleTab=0, UniformSampleSpacing=0
 OpenWindow="Console", DockArea=BOTTOM, x=1, y=0, w=271, h=323, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0
 SmartViewPlugin="", Page="", Toolbar="Hidden", Window="SmartView 1"
+TableHeader="Functions", SortCol="Name", SortOrder="ASCENDING", VisibleCols=["Name";"Address";"Size";"#Insts";"Source"], ColWidths=[1435;100;100;100;286]
 TableHeader="Data Sampling Table", SortCol="None", SortOrder="ASCENDING", VisibleCols=["Index";"Time"], ColWidths=[100;100]
 TableHeader="Data Sampling Setup", SortCol="Max. Change", SortOrder="ASCENDING", VisibleCols=["Expression";"Type";"Value";"Min";"Max";"Average";"# Changes";"Min. Change";"Max. Change"], ColWidths=[142;100;100;100;100;100;110;126;1410]
 TableHeader="Power Sampling", SortCol="None", SortOrder="ASCENDING", VisibleCols=["Index";"Time";"Ch 0"], ColWidths=[100;100;100]
 TableHeader="RegisterSelectionDialog", SortCol="None", SortOrder="ASCENDING", VisibleCols=[], ColWidths=[]
 TableHeader="TargetExceptionDialog", SortCol="Name", SortOrder="ASCENDING", VisibleCols=["Name";"Value";"Address";"Description"], ColWidths=[200;100;100;904]
-TableHeader="Functions", SortCol="Name", SortOrder="ASCENDING", VisibleCols=["Name";"Address";"Size";"#Insts";"Source"], ColWidths=[1435;100;100;100;286]
+TableHeader="Watched Data 1", SortCol="Expression", SortOrder="ASCENDING", VisibleCols=["Expression";"Value";"Location";"Refresh"], ColWidths=[321;267;133;401]
 WatchedExpression="pfc_adc_state", RefreshRate=5, Window=Watched Data 1
 WatchedExpression="pfc_start_request", RefreshRate=5, Window=Watched Data 1
 WatchedExpression="pfc_stop_request", RefreshRate=5, Window=Watched Data 1
