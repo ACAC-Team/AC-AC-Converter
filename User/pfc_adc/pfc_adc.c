@@ -1,6 +1,7 @@
 #include "pfc_adc.h"
 #include "pfc_adc_watchdog.h"
 #include "pfc_control.h"
+#include <math.h>
 
 /** PFC ADC对外运行数据。 */
 volatile PFC_ADC_StateTypeDef pfc_adc_state;
@@ -73,6 +74,68 @@ static float PFC_ADC_VBusLowPass500Hz(float input_v)
 }
 
 /**
+ * @brief          更新输入交流电压有效值
+ * @param[in]      input_voltage_v 输入交流瞬时电压，单位为V
+ * @retval         none
+ *
+ * @note           20kHz采样、50Hz输入时，每400点计算一次RMS。
+ */
+static void PFC_ADC_UpdateInputVoltageRms(
+    float input_voltage_v)
+{
+    PFC_ADC_InputVoltageRmsTypeDef *rms;
+    float rms_unfiltered_v;
+
+    rms = &pfc_adc_runtime.input_voltage_rms;
+
+    /* 累加瞬时电压平方。 */
+    rms->square_sum_v2 +=
+        input_voltage_v * input_voltage_v;
+
+    rms->sample_count++;
+
+    /* 未收集满一个50Hz周期时不更新结果。 */
+    if (rms->sample_count <
+        PFC_ADC_VIN_RMS_WINDOW_SAMPLES) {
+        return;
+        }
+
+    /* Vrms=sqrt(sum(v²)/N)。 */
+    rms_unfiltered_v =
+        sqrtf(
+            rms->square_sum_v2 /
+            (float)PFC_ADC_VIN_RMS_WINDOW_SAMPLES);
+
+    pfc_adc_state.measurement
+        .input_voltage_rms_unfiltered_v =
+        rms_unfiltered_v;
+
+    /* 第一个周期直接建立初值。 */
+    if (rms->initialized == 0U) {
+        rms->filtered_rms_v =
+            rms_unfiltered_v;
+
+        rms->initialized = 1U;
+    } else {
+        /* 对每周期计算出的RMS进行一阶平滑。 */
+        rms->filtered_rms_v +=
+            PFC_ADC_VIN_RMS_FILTER_ALPHA *
+            (rms_unfiltered_v -
+             rms->filtered_rms_v);
+    }
+
+    pfc_adc_state.measurement.input_voltage_rms_v =
+        rms->filtered_rms_v;
+
+    pfc_adc_state.measurement.input_voltage_rms_ready =
+        1U;
+
+    /* 开始下一个交流周期。 */
+    rms->square_sum_v2 = 0.0f;
+    rms->sample_count = 0U;
+}
+
+/**
 * @brief          校准ADC1并启动六Rank循环DMA采样
 * @param[in]      none
 * @retval         HAL_StatusTypeDef HAL执行状态
@@ -101,11 +164,11 @@ HAL_StatusTypeDef PFC_ADC_Stop(void)
 */
 void PFC_ADC_ProcessHalfTransfer(void)
 {
-    PFC_ADC_CalibrationWorkTypeDef *calibration;
+    // PFC_ADC_CalibrationWorkTypeDef *calibration;
     float bus_voltage_v;
     float bus_voltage_notched_v;
 
-    calibration = &pfc_adc_runtime.calibration;
+    // calibration = &pfc_adc_runtime.calibration;
 
     /*
      * 立即锁存前三个Rank。
@@ -118,35 +181,35 @@ void PFC_ADC_ProcessHalfTransfer(void)
     pfc_adc_state.raw.bus_voltage =
         pfc_adc_state.dma.sample[PFC_ADC_VBUS_INDEX];
 
-    /*
-     * 按原工程流程进行上电零点校准。
-     * 校准期间交流输入、电感电流和PWM功率输出必须为0。
-     */
-    if (pfc_adc_state.calibration.ready == 0U) {
-        if (calibration->discard_count <
-            PFC_ADC_CALIB_DISCARD) {
-            calibration->discard_count++;
-            return;
-        }
-
-        calibration->current_offset_sum +=
-            pfc_adc_state.raw.input_current;
-        calibration->voltage_offset_sum +=
-            pfc_adc_state.raw.input_voltage;
-        calibration->sample_count++;
-
-        if (calibration->sample_count >=
-            PFC_ADC_CALIB_SAMPLES) {
-            pfc_adc_state.calibration.current_offset_count =
-                (float)calibration->current_offset_sum /
-                (float)PFC_ADC_CALIB_SAMPLES;
-            pfc_adc_state.calibration.voltage_offset_count =
-                (float)calibration->voltage_offset_sum /
-                (float)PFC_ADC_CALIB_SAMPLES;
-            pfc_adc_state.calibration.ready = 1U;
-        }
-        return;
-    }
+    // /*
+    //  * 按原工程流程进行上电零点校准。
+    //  * 校准期间交流输入、电感电流和PWM功率输出必须为0。
+    //  */
+    // if (pfc_adc_state.calibration.ready == 0U) {
+    //     if (calibration->discard_count <
+    //         PFC_ADC_CALIB_DISCARD) {
+    //         calibration->discard_count++;
+    //         return;
+    //     }
+    //
+    //     calibration->current_offset_sum +=
+    //         pfc_adc_state.raw.input_current;
+    //     calibration->voltage_offset_sum +=
+    //         pfc_adc_state.raw.input_voltage;
+    //     calibration->sample_count++;
+    //
+    //     if (calibration->sample_count >=
+    //         PFC_ADC_CALIB_SAMPLES) {
+    //         pfc_adc_state.calibration.current_offset_count =
+    //             (float)calibration->current_offset_sum /
+    //             (float)PFC_ADC_CALIB_SAMPLES;
+    //         pfc_adc_state.calibration.voltage_offset_count =
+    //             (float)calibration->voltage_offset_sum /
+    //             (float)PFC_ADC_CALIB_SAMPLES;
+    //         pfc_adc_state.calibration.ready = 1U;
+    //     }
+    //     return;
+    // }
 
     pfc_adc_state.measurement.input_current_a =
         ((float)pfc_adc_state.raw.input_current -
@@ -157,6 +220,9 @@ void PFC_ADC_ProcessHalfTransfer(void)
         ((float)pfc_adc_state.raw.input_voltage -
          pfc_adc_state.calibration.voltage_offset_count) *
         PFC_ADC_VIN_V_PER_COUNT;//改符号
+
+    PFC_ADC_UpdateInputVoltageRms(
+    pfc_adc_state.measurement.input_voltage_v);
 
     bus_voltage_v =
         ((float)pfc_adc_state.raw.bus_voltage -
@@ -180,12 +246,10 @@ void PFC_ADC_ProcessHalfTransfer(void)
 }
 
 /**
-* @brief          处理ADC1规则组DMA半传输完成事件
-* @param[in]      hadc ADC句柄地址
-* @retval         none
-*
-* @note           本工程没有其他用户文件定义该HAL回调，因此直接放在本文件中。
-*/
+ * @brief          处理ADC1规则组DMA半传输完成事件
+ * @param[in]      hadc ADC句柄地址
+ * @retval         none
+ */
 void HAL_ADC_ConvHalfCpltCallback(
     ADC_HandleTypeDef *hadc)
 {
@@ -193,11 +257,24 @@ void HAL_ADC_ConvHalfCpltCallback(
         return;
     }
 
+    /*
+     * 必须先处理本次ADC采样：
+     * 锁存原始值、换算物理量、计算输入电压RMS、
+     * 更新母线陷波和低通结果。
+     */
     PFC_ADC_ProcessHalfTransfer();
 
+    /* 把实时输入交流电压RMS送给控制器。 */
+    if (pfc_adc_state.measurement
+            .input_voltage_rms_ready != 0U) {
+        PFC_Control_SetInputVoltageRms(
+            pfc_adc_state.measurement
+                .input_voltage_rms_v);
+            }
+
     /*
-     * 校准完成、没有故障且四路PWM已经投入后，计算并预装载
-     * 下一个PWM周期的Timer E/F比较值。
+     * 无故障且PWM已投入时，
+     * 计算并预装载下一PWM周期的控制量。
      */
     if ((pfc_adc_state.calibration.ready != 0U) &&
         (pfc_adc_fault == PFC_ADC_FAULT_NONE) &&
@@ -206,7 +283,7 @@ void HAL_ADC_ConvHalfCpltCallback(
             pfc_adc_state.measurement.input_voltage_v,
             pfc_adc_state.measurement.input_current_a,
             pfc_adc_state.measurement.bus_voltage_v);
-    }
+        }
 }
 
 /**
@@ -239,6 +316,10 @@ HAL_StatusTypeDef PFC_ADC_SamplingStart(void)
         PFC_ADC_IIN_OFFSET_COUNT;
     pfc_adc_state.calibration.voltage_offset_count =
         PFC_ADC_VIN_OFFSET_COUNT;
+    /*
+ * 使用固定零点，不进行启动自动校准。
+ */
+    pfc_adc_state.calibration.ready = 1U;
 
     /* 执行ADC1单端输入校准。 */
     status = HAL_ADCEx_Calibration_Start(

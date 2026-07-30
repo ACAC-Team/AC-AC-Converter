@@ -4,8 +4,8 @@
 #include <stdint.h>
 #include "pfc_adc.h"
 
-#define PFC_ADC_CURRENT_LIMIT_A       8.0f /**< PFC输入电流硬件过流阈值，单位为A。 */
-#define PFC_ADC_BUS_OVERVOLTAGE_V    70.0f /**< PFC直流母线硬件过压阈值，单位为V。 */
+#define PFC_ADC_CURRENT_LIMIT_A       12.0f /**< PFC输入电流硬件过流阈值，单位为A。 */
+#define PFC_ADC_BUS_OVERVOLTAGE_V    80.0f /**< PFC直流母线硬件过压阈值，单位为V。 */
 
 #define PFC_ADC_FAULT_NONE             0U        /**< 当前没有ADC故障。 */
 #define PFC_ADC_FAULT_OVERCURRENT     (1UL << 0) /**< PFC输入过流故障。 */

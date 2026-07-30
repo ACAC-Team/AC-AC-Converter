@@ -26,7 +26,7 @@ static uint8_t pfc_app_initialized;
 HAL_StatusTypeDef PFC_App_Init(void)
 {
     HAL_StatusTypeDef status;
-    uint32_t calibration_start_tick;
+    // uint32_t calibration_start_tick;
 
     pfc_start_request = 0U;
     pfc_stop_request = 0U;
@@ -64,20 +64,20 @@ HAL_StatusTypeDef PFC_App_Init(void)
         return status;
     }
 
-    /*
-     * 等待输入电压和输入电流零点校准。
-     * 校准期间必须保持交流输入、电感电流和PWM输出为0。
-     */
-    calibration_start_tick = HAL_GetTick();
-    while (pfc_adc_state.calibration.ready == 0U) {
-        if ((HAL_GetTick() - calibration_start_tick) >=
-            PFC_APP_CALIBRATION_TIMEOUT_MS) {
-            PFC_PWM_Disable();
-            (void)PFC_ADC_Stop();
-            pfc_app_last_status = HAL_TIMEOUT;
-            return HAL_TIMEOUT;
-        }
-    }
+    // /*
+    //  * 等待输入电压和输入电流零点校准。
+    //  * 校准期间必须保持交流输入、电感电流和PWM输出为0。
+    //  */
+    // calibration_start_tick = HAL_GetTick();
+    // while (pfc_adc_state.calibration.ready == 0U) {
+    //     if ((HAL_GetTick() - calibration_start_tick) >=
+    //         PFC_APP_CALIBRATION_TIMEOUT_MS) {
+    //         PFC_PWM_Disable();
+    //         (void)PFC_ADC_Stop();
+    //         pfc_app_last_status = HAL_TIMEOUT;
+    //         return HAL_TIMEOUT;
+    //     }
+    // }
 
     /*
      * 先清除上电软件故障标志，再配置输入过流和母线过压
@@ -110,6 +110,7 @@ HAL_StatusTypeDef PFC_App_Init(void)
     pfc_app_initialized = 1U;
     pfc_app_last_status = HAL_OK;
     /* 所有初始化、校准和保护检查完成后才提交启动请求。 */
+    HAL_Delay(2000);
     pfc_start_request = 1U;
 
     return HAL_OK;

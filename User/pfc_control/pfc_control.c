@@ -29,6 +29,24 @@ static float PFC_Control_Clamp(float value,
 }
 
 /**
+ * @brief 根据当前输入RMS更新输入电压功率前馈增益
+ */
+static void PFC_Control_UpdateLineFeedforward(void)
+{
+    float line_feedforward_gain;
+
+    line_feedforward_gain =
+        PFC_INPUT_RMS_NOMINAL_V /
+        pfc_control_state.input_voltage_rms_v;
+
+    pfc_control_state.line_feedforward_gain =
+        PFC_Control_Clamp(
+            line_feedforward_gain,
+            PFC_LINE_FEEDFORWARD_MIN,
+            PFC_LINE_FEEDFORWARD_MAX);
+}
+
+/**
  * @brief          清除电流PR内环的运行历史量
  * @param[in]      none
  * @retval         none
@@ -104,6 +122,8 @@ static void PFC_Control_ResetLoopState(
     pfc_control_state.bus_feedback_v =
         initial_bus_voltage_v;
     pfc_control_state.bus_error_v = 0.0f;
+    pfc_control_state.current_command_nominal_rms_a = 0.0f;
+    pfc_control_state.input_voltage_unit = 0.0f;
     pfc_control_state.current_reference_rms_a = 0.0f;
     pfc_control_state.current_reference_a = 0.0f;
     pfc_control_state.current_error_a = 0.0f;
@@ -112,23 +132,30 @@ static void PFC_Control_ResetLoopState(
     pfc_control_state.modulation = 0.0f;
     pfc_control_state.modulation_saturated = 0U;
 
+
+
+    PFC_Control_UpdateLineFeedforward();
     PFC_Control_ConfigureCurrentPR();
 }
 
 /**
- * @brief          执行一次正常PFC模式的母线电压PI外环
+ * @brief          执行母线电压PI外环
  * @param[in]      bus_voltage_v 母线反馈电压，单位为V
  * @retval         none
  */
-static void PFC_Control_RunVoltageLoop(float bus_voltage_v)
+static void PFC_Control_RunVoltageLoop(
+    float bus_voltage_v)
 {
     PFC_ControlVoltagePITypeDef *pi;
+    float nominal_current_limit_rms_a;
+    float nominal_current_command_rms_a;
 
     pi = &pfc_control_runtime.voltage_pi;
+
     pfc_control_state.bus_feedback_v =
         bus_voltage_v;
 
-    /* 按设定斜率缓慢提升母线参考值。 */
+    /* 母线目标软启动。 */
     if (pfc_control_state.bus_reference_v <
         PFC_BUS_TARGET_V) {
         pfc_control_state.bus_reference_v +=
@@ -146,11 +173,22 @@ static void PFC_Control_RunVoltageLoop(float bus_voltage_v)
         pfc_control_state.bus_reference_v -
         pfc_control_state.bus_feedback_v;
 
-    /*
-     * 电压PI输出为输入正弦电流的有效值给定。
-     * 积分项和最终输出都限制在允许电流范围内。
-     */
     if (pi->divider_count == 0U) {
+        /*
+         * 最终电流命令不能超过3A，因此先根据线电压
+         * 前馈增益反算PI额定电流命令的最大值。
+         */
+        nominal_current_limit_rms_a =
+            PFC_CURRENT_REF_MAX_RMS_A /
+            pfc_control_state.line_feedforward_gain;
+
+        nominal_current_limit_rms_a =
+            PFC_Control_Clamp(
+                nominal_current_limit_rms_a,
+                0.0f,
+                PFC_CURRENT_REF_MAX_RMS_A);
+
+        /* 电压PI积分。 */
         pi->integral =
             PFC_Control_Clamp(
                 pi->integral +
@@ -159,18 +197,35 @@ static void PFC_Control_RunVoltageLoop(float bus_voltage_v)
                 ((float)PFC_VOLTAGE_LOOP_DIVIDER /
                  PFC_CONTROL_FREQ_HZ),
                 0.0f,
-                PFC_CURRENT_REF_MAX_RMS_A);
+                nominal_current_limit_rms_a);
 
-        pfc_control_state.current_reference_rms_a =
+        /* 额定35V输入下的电流命令。 */
+        nominal_current_command_rms_a =
             PFC_Control_Clamp(
                 PFC_BUS_PI_KP *
                 pfc_control_state.bus_error_v +
                 pi->integral,
                 0.0f,
+                nominal_current_limit_rms_a);
+
+        pfc_control_state
+            .current_command_nominal_rms_a =
+            nominal_current_command_rms_a;
+
+        /*
+         * 输入31V时增大电流，输入41V时减小电流，
+         * 使输入变化时功率大致保持不变。
+         */
+        pfc_control_state.current_reference_rms_a =
+            PFC_Control_Clamp(
+                nominal_current_command_rms_a *
+                pfc_control_state.line_feedforward_gain,
+                0.0f,
                 PFC_CURRENT_REF_MAX_RMS_A);
     }
 
     pi->divider_count++;
+
     if (pi->divider_count >=
         PFC_VOLTAGE_LOOP_DIVIDER) {
         pi->divider_count = 0U;
@@ -196,13 +251,20 @@ static float PFC_Control_RunCurrentLoop(
     pr = &pfc_control_runtime.current_pr;
 
     /*
-     * Vin/Vin_rms的峰值为√2，所以电流有效值给定乘以该波形后，
-     * 得到与输入电压同相的瞬时正弦电流给定。
+     * 使用实时输入RMS归一化输入电压。
+     * 理想正弦波的Vin/Vin_rms自身有效值等于1。
      */
+    pfc_control_state.input_voltage_unit =
+        PFC_Control_Clamp(
+            input_voltage_v /
+            pfc_control_state.input_voltage_rms_v,
+            -PFC_INPUT_UNIT_LIMIT,
+            PFC_INPUT_UNIT_LIMIT);
+
+    /* 生成与输入电压同相的瞬时电流参考。 */
     pfc_control_state.current_reference_a =
         pfc_control_state.current_reference_rms_a *
-        input_voltage_v /
-        PFC_INPUT_RMS_V;
+        pfc_control_state.input_voltage_unit;
 
     pfc_control_state.current_error_a =
         pfc_control_state.current_reference_a -
@@ -307,6 +369,17 @@ void PFC_Control_Init(float initial_bus_voltage_v)
             PFC_CURRENT_LOOP_REFERENCE_RMS_A,
             0.0f,
             PFC_CURRENT_REF_MAX_RMS_A);
+    /*
+ * 第一个交流周期RMS尚未计算完成时，
+ * 暂时使用35V默认输入有效值。
+ */
+    pfc_control_state.input_voltage_rms_v =
+        PFC_INPUT_RMS_NOMINAL_V;
+
+    pfc_control_state.input_voltage_rms_valid = 0U;
+    pfc_control_state.input_voltage_unit = 0.0f;
+
+    PFC_Control_UpdateLineFeedforward();
 
     PFC_Control_ResetLoopState(
         initial_bus_voltage_v);
@@ -358,6 +431,31 @@ void PFC_Control_SetCurrentReferenceRms(
             current_reference_rms_a,
             0.0f,
             PFC_CURRENT_REF_MAX_RMS_A);
+}
+
+/**
+ * @brief          更新控制器使用的输入交流电压有效值
+ * @param[in]      input_voltage_rms_v 输入电压有效值，单位为V RMS
+ * @retval         none
+ */
+void PFC_Control_SetInputVoltageRms(
+    float input_voltage_rms_v)
+{
+    /* 异常结果不允许覆盖上一次有效RMS。 */
+    if ((input_voltage_rms_v <
+         PFC_INPUT_RMS_MIN_VALID_V) ||
+        (input_voltage_rms_v >
+         PFC_INPUT_RMS_MAX_VALID_V)) {
+        return;
+         }
+
+    pfc_control_state.input_voltage_rms_v =
+        input_voltage_rms_v;
+
+    pfc_control_state.input_voltage_rms_valid =
+        1U;
+
+    PFC_Control_UpdateLineFeedforward();
 }
 
 /**

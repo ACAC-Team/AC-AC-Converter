@@ -11,11 +11,11 @@
 #define PFC_ADC_VBUS_INDEX       2U       /**< PFC直流母线电压所在Rank对应的DMA数组索引。 */
 #define PFC_ADC_VREF             3.3f     /**< ADC参考电压，单位为V。 */
 #define PFC_ADC_FULL_SCALE       4095.0f  /**< 12位ADC满量程计数值。 */
-#define PFC_ADC_VIN_SCALE        39.89f   /**< PFC输入电压采样模块的还原倍率。 */
+#define PFC_ADC_VIN_SCALE        60.92f   /**< PFC输入电压采样模块的还原倍率。 */
 #define PFC_ADC_IIN_GAIN_V_PER_A 0.08334f /**< PFC输入电流采样增益，单位为V/A。 */
 #define PFC_ADC_VBUS_SCALE       29.7f   /**< 直流母线电压采样模块的校准还原倍率。 */
-#define PFC_ADC_VIN_OFFSET_V     1.65f    /**< PFC输入电压采样通道的偏置电压，单位为V。 */
-#define PFC_ADC_IIN_OFFSET_V     1.71f    /**< PFC输入电流采样通道的偏置电压，单位为V。 */
+#define PFC_ADC_VIN_OFFSET_V     1.7524f    /**< PFC输入电压采样通道的偏置电压，单位为V。 */
+#define PFC_ADC_IIN_OFFSET_V     1.6786f    /**< PFC输入电流采样通道的偏置电压，单位为V。 */
 #define PFC_ADC_VBUS_OFFSET_V    0.0f     /**< PFC直流母线电压采样通道的偏置电压，单位为V。 */
 #define PFC_ADC_SAMPLE_FREQ_HZ   20000.0f /**< HRTIM触发ADC1规则组的采样频率，单位为Hz。 */
 #define PFC_ADC_VBUS_LPF_HZ      500.0f   /**< 直流母线一阶低通滤波截止频率，单位为Hz。 */
@@ -23,6 +23,16 @@
 #define PFC_ADC_CALIB_SAMPLES    4096U    /**< 用于计算输入电压和输入电流零点的样本数。 */
 #define PFC_ADC_TWO_PI           6.28318530718f /**< 计算数字滤波系数使用的2π常数。 */
 
+/**
+ * 输入50Hz、ADC采样20kHz时，一个交流周期对应400个采样点。
+ */
+#define PFC_ADC_VIN_RMS_WINDOW_SAMPLES 400U
+
+/**
+ * 输入电压RMS周期级低通滤波系数。
+ * 越大响应越快，越小结果越平滑。
+ */
+#define PFC_ADC_VIN_RMS_FILTER_ALPHA 0.50f
 /**
  * 100Hz二阶陷波器系数。
  * 适用于20kHz采样频率、100Hz中心频率和Q=5。
@@ -81,17 +91,34 @@ typedef struct
 } PFC_ADC_RawDataTypeDef;
 
 /**
- * @brief PFC采样通道换算结果结构体
+ * @brief PFC采样物理量和滤波结果
  */
 typedef struct
 {
-    float input_voltage_v;         /**< PFC输入瞬时电压，单位为V。 */
-    float input_current_a;         /**< PFC输入瞬时电流，单位为A。 */
-    float bus_voltage_unfiltered_v; /**< 倍率换算后的未滤波直流母线电压，单位为V。 */
-    float bus_voltage_notched_v;   /**< 经过100Hz陷波后的直流母线电压，单位为V。 */
-    float bus_voltage_v;           /**< 经过100Hz陷波和500Hz低通后的直流母线电压，单位为V。 */
-} PFC_ADC_MeasurementTypeDef;
+    /** 输入交流瞬时电压，单位为V。 */
+    float input_voltage_v;
 
+    /** 输入交流瞬时电流，单位为A。 */
+    float input_current_a;
+
+    /** 最近一个完整周期直接计算出的输入电压有效值，单位为V RMS。 */
+    float input_voltage_rms_unfiltered_v;
+
+    /** 经过周期级平滑后的输入电压有效值，单位为V RMS。 */
+    float input_voltage_rms_v;
+
+    /** RMS有效标志：0表示尚未计算完成，1表示结果可用。 */
+    uint8_t input_voltage_rms_ready;
+
+    /** 未滤波母线电压，单位为V。 */
+    float bus_voltage_unfiltered_v;
+
+    /** 经过100Hz陷波后的母线电压，单位为V。 */
+    float bus_voltage_notched_v;
+
+    /** 最终用于控制的母线反馈电压，单位为V。 */
+    float bus_voltage_v;
+} PFC_ADC_MeasurementTypeDef;
 /**
  * @brief PFC输入电压和输入电流零点校准结果结构体
  */
@@ -125,6 +152,24 @@ typedef struct
 } PFC_ADC_CalibrationWorkTypeDef;
 
 /**
+ * @brief 输入交流电压周期RMS计算状态
+ */
+typedef struct
+{
+    /** 当前RMS窗口内输入电压平方和，单位为V²。 */
+    float square_sum_v2;
+
+    /** 当前窗口已经累计的采样点数。 */
+    uint16_t sample_count;
+
+    /** 平滑后的输入电压有效值，单位为V RMS。 */
+    float filtered_rms_v;
+
+    /** RMS滤波器初始化标志。 */
+    uint8_t initialized;
+} PFC_ADC_InputVoltageRmsTypeDef;
+
+/**
  * @brief 二阶陷波器运行状态结构体
  */
 typedef struct
@@ -146,15 +191,22 @@ typedef struct
 } PFC_ADC_LowPassStateTypeDef;
 
 /**
- * @brief PFC ADC内部运行状态结构体
+ * @brief PFC ADC模块内部运行状态
  */
 typedef struct
 {
-    PFC_ADC_CalibrationWorkTypeDef calibration; /**< 输入电压和输入电流自动零点校准过程状态。 */
-    PFC_ADC_NotchStateTypeDef bus_voltage_notch; /**< 直流母线100Hz二阶陷波器运行状态。 */
-    PFC_ADC_LowPassStateTypeDef bus_voltage_lpf; /**< 直流母线500Hz一阶低通滤波器运行状态。 */
-} PFC_ADC_RuntimeTypeDef;
+    /** 输入电压和输入电流零点校准状态。 */
+    PFC_ADC_CalibrationWorkTypeDef calibration;
 
+    /** 输入交流电压RMS计算状态。 */
+    PFC_ADC_InputVoltageRmsTypeDef input_voltage_rms;
+
+    /** 母线100Hz陷波器状态。 */
+    PFC_ADC_NotchStateTypeDef bus_voltage_notch;
+
+    /** 母线低通滤波器状态。 */
+    PFC_ADC_LowPassStateTypeDef bus_voltage_lpf;
+} PFC_ADC_RuntimeTypeDef;
 
 /** PFC ADC对外运行数据。 */
 extern volatile PFC_ADC_StateTypeDef pfc_adc_state;

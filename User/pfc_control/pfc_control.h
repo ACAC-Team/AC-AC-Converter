@@ -74,17 +74,33 @@ PFC_CONTROL_MODE_PFC
 #define PFC_GRID_FREQ_HZ 50.0f
 
 /**
- * 输入交流电压有效值，单位为V。
- *
- * @note 用于把电流有效值给定换算为与输入电压同相的瞬时电流给定。
+ * 尚未完成实时RMS计算时使用的默认输入电压，单位为V RMS。
  */
-#define PFC_INPUT_RMS_V 35.0f
+#define PFC_INPUT_RMS_NOMINAL_V 35.0f
+
+/** 允许接受的最小输入电压有效值。 */
+#define PFC_INPUT_RMS_MIN_VALID_V 28.0f
+
+/** 允许接受的最大输入电压有效值。 */
+#define PFC_INPUT_RMS_MAX_VALID_V 45.0f
+
+/**
+ * Vin/Vin_rms的绝对值上限。
+ * 理想正弦峰值为1.414，留出噪声裕量。
+ */
+#define PFC_INPUT_UNIT_LIMIT 1.55f
+
+/** 输入电压功率前馈最小增益。 */
+#define PFC_LINE_FEEDFORWARD_MIN 0.70f
+
+/** 输入电压功率前馈最大增益。 */
+#define PFC_LINE_FEEDFORWARD_MAX 1.30f
 
 /** 正常PFC模式的直流母线目标电压，单位为V。 */
 #define PFC_BUS_TARGET_V  60.0f
 
 /** 正常PFC模式的母线参考电压软启动斜率，单位为V/s。 */
-#define PFC_BUS_REF_SLEW_V_PER_S 0.5f
+#define PFC_BUS_REF_SLEW_V_PER_S 2.0f
 
 
 /** 允许计算调制度的最低母线电压，单位为V。 */
@@ -103,21 +119,21 @@ PFC_CONTROL_MODE_PFC
 #define PFC_VOLTAGE_LOOP_DIVIDER 1U
 
 /** 直流母线电压PI控制器比例增益。 */
-#define PFC_BUS_PI_KP 1.5f
+#define PFC_BUS_PI_KP 0.3f
 
 /** 直流母线电压PI控制器积分增益。 */
-#define PFC_BUS_PI_KI 10.0f
+#define PFC_BUS_PI_KI 15.0f
 
 /** 电压环和单电流环允许的最大电流有效值给定，单位为A RMS。 */
-#define PFC_CURRENT_REF_MAX_RMS_A 2.5f
+#define PFC_CURRENT_REF_MAX_RMS_A 4.0f
 
 /* ==================== 输入电流PR内环参数 ==================== */
 
 /** 输入电流PR控制器比例增益。 */
-#define PFC_CURRENT_PR_KP 2.5f
+#define PFC_CURRENT_PR_KP 5.0f//4.8f
 
 /** 输入电流PR控制器谐振增益。 */
-#define PFC_CURRENT_PR_KR 15.0f
+#define PFC_CURRENT_PR_KR 20.0f//18.0f
 
 /** 输入电流PR控制器谐振带宽，单位为rad/s。 */
 #define PFC_CURRENT_PR_WC_RAD_S 5.0f
@@ -179,10 +195,14 @@ typedef struct
     float fixed_timer_e_duty;        /**< EF固定模式的Timer E上管占空比。 */
     float fixed_timer_f_duty;        /**< EF固定模式的Timer F上管占空比。 */
     float current_loop_reference_rms_a; /**< 单电流环模式的手动电流给定。 */
-
+    float input_voltage_rms_v;/*** 控制器当前使用的输入交流有效值，单位为V RMS。*/
+    float input_voltage_unit;  /*** 输入瞬时电压归一化值Vin/Vin_rms。*/
+    float line_feedforward_gain;/*** 输入电压功率前馈增益，等于35V/实测输入RMS。*/
+    uint8_t input_voltage_rms_valid;/*** 输入电压RMS有效标志。*/
     float bus_reference_v;          /**< 软启动后的母线参考电压，单位为V。 */
     float bus_feedback_v;           /**< 母线反馈电压，单位为V。 */
     float bus_error_v;              /**< 母线参考值与反馈值之差，单位为V。 */
+    float current_command_nominal_rms_a;    /*** 电压PI输出的额定输入电压下电流命令，单位为A RMS。* 该值还没有乘输入电压功率前馈。*/
     float current_reference_rms_a;  /**< 当前实际使用的电流有效值给定。 */
     float current_reference_a;      /**< 与输入电压同相的瞬时电流给定。 */
     float current_error_a;          /**< 瞬时电流给定与采样电流之差。 */
@@ -234,6 +254,14 @@ void PFC_Control_SetFixedEFDuty(float timer_e_duty,
  */
 void PFC_Control_SetCurrentReferenceRms(
     float current_reference_rms_a);
+
+/**
+ * @brief          更新控制器使用的输入交流电压有效值
+ * @param[in]      input_voltage_rms_v 输入电压有效值，单位为V RMS
+ * @retval         none
+ */
+void PFC_Control_SetInputVoltageRms(
+    float input_voltage_rms_v);
 
 /**
  * @brief          根据当前模式执行一次控制算法

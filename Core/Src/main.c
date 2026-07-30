@@ -64,26 +64,42 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-float Current_GetRMS(float current_a)
+
+// 采样偏置校准函数
+ float Average_Update(float new_value)
+ {
+   static uint64_t sample_count = 0U;
+   static double average = 0.0;
+
+   sample_count++;
+
+   average += ((double)new_value - average) /
+              (double)sample_count;
+
+   return (float)average;
+ }
+ /* USER CODE END 0 */
+ float average_value_v = 0.0f;
+ float average_value_i = 0.0f;
+
+float GetVoltageRms(float voltage_v)
 {
-  static float sum_sq = 0.0f;
-  static uint16_t count = 0;
+  static float sum = 0.0f;
   static float rms = 0.0f;
+  static uint16_t count = 0U;
 
-  sum_sq += current_a * current_a;
+  sum += voltage_v * voltage_v;
+  count++;
 
-  if (++count >= 400U) {
-    rms = sqrtf(sum_sq / 400.0f);
-    sum_sq = 0.0f;
+  /* 20kHz采样、50Hz交流：一个周期400个采样点。 */
+  if (count >= 400U) {
+    rms = sqrtf(sum / 400.0f);
+    sum = 0.0f;
     count = 0U;
   }
 
   return rms;
 }
-
-float a = 0;
-
-/* USER CODE END 0 */
 
 /**
   * @brief  The application entry point.
@@ -128,9 +144,12 @@ int main(void)
   MX_CORDIC_Init();
   /* USER CODE BEGIN 2 */
   // HAL_Delay(2000);
+
   if (PFC_App_Init() != HAL_OK) {
     Error_Handler();
   }
+
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -138,9 +157,14 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-    a = Current_GetRMS(pfc_adc_state.measurement.input_current_a);
+
     /* USER CODE BEGIN 3 */
+    // average_value_v = Average_Update(pfc_adc_state.measurement.input_voltage_v );
+    // average_value_i = Average_Update(pfc_adc_state.measurement.input_current_a );
+    // input_voltage_rms_test = GetVoltageRms(pfc_adc_state.measurement.input_voltage_v);
+    // average_value_v = Average_Update(input_voltage_rms_test);
     PFC_App_Loop();
+
   }
   /* USER CODE END 3 */
 }
