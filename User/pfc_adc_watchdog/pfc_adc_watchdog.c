@@ -35,7 +35,7 @@ static void TripFromISR(uint32_t fault)
     hhrtim1.Instance->sCommonRegs.ODISR = PFC_PWM_OUTPUTS;
     pfc_adc_fault |= fault;
 }
-
+ADC_AnalogWDGConfTypeDef watchdog = {0};
 /**
 * @brief          配置PFC输入过流和母线过压ADC硬件看门狗
 * @param[in]      none
@@ -43,7 +43,7 @@ static void TripFromISR(uint32_t fault)
 */
 HAL_StatusTypeDef PFC_ADC_Watchdog_Init(void)
 {
-    ADC_AnalogWDGConfTypeDef watchdog = {0};
+    // ADC_AnalogWDGConfTypeDef watchdog = {0};
     HAL_StatusTypeDef status;
     HAL_StatusTypeDef restart_status;
     float current_limit_count;
@@ -111,7 +111,7 @@ HAL_StatusTypeDef PFC_ADC_Watchdog_Init(void)
     watchdog.Channel =
         ADC_CHANNEL_2;
 
-    watchdog.ITMode = ENABLE;
+    watchdog.ITMode = ENABLE;//母线电压看门狗使能
     watchdog.LowThreshold = 0U;
 
     watchdog.HighThreshold = ClampAdcCount(

@@ -127,6 +127,7 @@ int main(void)
   MX_TIM1_Init();
   MX_CORDIC_Init();
   /* USER CODE BEGIN 2 */
+  // HAL_Delay(2000);
   if (PFC_App_Init() != HAL_OK) {
     Error_Handler();
   }

@@ -43,6 +43,7 @@ typedef enum
 PFC_CONTROL_MODE_PFC
 #endif
 
+
 /**
  * EF固定模式下Timer E上管S1的默认占空比。
  *
@@ -62,7 +63,7 @@ PFC_CONTROL_MODE_PFC
  *
  * @note 首次带功率调试建议从较小电流开始。
  */
-#define PFC_CURRENT_LOOP_REFERENCE_RMS_A 0.5f
+#define PFC_CURRENT_LOOP_REFERENCE_RMS_A 1.5f//只有单电流环才会生效
 
 /* ==================== PFC基本控制参数 ==================== */
 
@@ -77,13 +78,14 @@ PFC_CONTROL_MODE_PFC
  *
  * @note 用于把电流有效值给定换算为与输入电压同相的瞬时电流给定。
  */
-#define PFC_INPUT_RMS_V 36.0f
+#define PFC_INPUT_RMS_V 12.0f
 
 /** 正常PFC模式的直流母线目标电压，单位为V。 */
-#define PFC_BUS_TARGET_V 40.0f
+#define PFC_BUS_TARGET_V  20.0f
 
 /** 正常PFC模式的母线参考电压软启动斜率，单位为V/s。 */
-#define PFC_BUS_REF_SLEW_V_PER_S 0.5f
+#define PFC_BUS_REF_SLEW_V_PER_S 0.25f
+
 
 /** 允许计算调制度的最低母线电压，单位为V。 */
 #define PFC_MIN_BUS_V 1.0f
@@ -101,7 +103,7 @@ PFC_CONTROL_MODE_PFC
 #define PFC_VOLTAGE_LOOP_DIVIDER 1U
 
 /** 直流母线电压PI控制器比例增益。 */
-#define PFC_BUS_PI_KP 0.1f
+#define PFC_BUS_PI_KP 0.2f
 
 /** 直流母线电压PI控制器积分增益。 */
 #define PFC_BUS_PI_KI 20.0f
@@ -121,7 +123,7 @@ PFC_CONTROL_MODE_PFC
 #define PFC_CURRENT_PR_WC_RAD_S 5.0f
 
 /** 输入电流PR控制器输出电压绝对值上限，单位为V。 */
-#define PFC_CURRENT_PR_OUTPUT_LIMIT_V 4.0f
+#define PFC_CURRENT_PR_OUTPUT_LIMIT_V 3.5f
 
 /**
  * PFC归一化调制度绝对值上限。
