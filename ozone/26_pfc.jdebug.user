@@ -1,7 +1,7 @@
 
 
 
-Breakpoint=D:/26_pfc/User/pfc_adc/pfc_adc.c:103:1, State=BP_STATE_DISABLED
+Breakpoint=D:/26_pfc/User/pfc_adc/pfc_adc.c:105:9, State=BP_STATE_DISABLED
 Breakpoint=D:/26_pfc/User/pfc_adc_watchdog/pfc_adc_watchdog.c:122:30, State=BP_STATE_DISABLED
 OpenDocument="stm32g4xx_hal.c", FilePath="D:/26_pfc/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal.c", Line=398
 OpenDocument="pfc_pwm.c", FilePath="D:/26_pfc/User/pfc_pwm/pfc_pwm.c", Line=476
@@ -26,9 +26,8 @@ TableHeader="Functions", SortCol="Name", SortOrder="ASCENDING", VisibleCols=["Na
 TableHeader="Data Sampling Table", SortCol="None", SortOrder="ASCENDING", VisibleCols=["Index";"Time"], ColWidths=[100;100]
 TableHeader="Data Sampling Setup", SortCol="Max. Change", SortOrder="ASCENDING", VisibleCols=["Expression";"Type";"Value";"Min";"Max";"Average";"# Changes";"Min. Change";"Max. Change"], ColWidths=[142;100;100;100;100;100;110;126;1410]
 TableHeader="Power Sampling", SortCol="None", SortOrder="ASCENDING", VisibleCols=["Index";"Time";"Ch 0"], ColWidths=[100;100;100]
+TableHeader="Watched Data 1", SortCol="Expression", SortOrder="ASCENDING", VisibleCols=["Expression";"Value";"Location";"Refresh"], ColWidths=[321;267;133;427]
 TableHeader="RegisterSelectionDialog", SortCol="None", SortOrder="ASCENDING", VisibleCols=[], ColWidths=[]
-TableHeader="TargetExceptionDialog", SortCol="Name", SortOrder="ASCENDING", VisibleCols=["Name";"Value";"Address";"Description"], ColWidths=[200;100;100;904]
-TableHeader="Watched Data 1", SortCol="Expression", SortOrder="ASCENDING", VisibleCols=["Expression";"Value";"Location";"Refresh"], ColWidths=[321;267;133;401]
 WatchedExpression="pfc_adc_state", RefreshRate=5, Window=Watched Data 1
 WatchedExpression="pfc_start_request", RefreshRate=5, Window=Watched Data 1
 WatchedExpression="pfc_stop_request", RefreshRate=5, Window=Watched Data 1

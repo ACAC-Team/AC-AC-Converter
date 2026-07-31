@@ -31,22 +31,22 @@
  */
 
 /** 第一路逆变电压采样偏置，单位为V。 */
-#define INVERTER_ADC_VOLTAGE_1_OFFSET_V         1.65f
+#define INVERTER_ADC_VOLTAGE_1_OFFSET_V         1.749f
 
 /** 第二路逆变电压采样偏置，单位为V。 */
-#define INVERTER_ADC_VOLTAGE_2_OFFSET_V         1.65f
+#define INVERTER_ADC_VOLTAGE_2_OFFSET_V         1.818f
 
 /** 第一路逆变电压采样还原倍率：实际电压/ADC引脚电压。 */
-#define INVERTER_ADC_VOLTAGE_1_SCALE            1.0f
+#define INVERTER_ADC_VOLTAGE_1_SCALE            60.51f
 
 /** 第二路逆变电压采样还原倍率：实际电压/ADC引脚电压。 */
-#define INVERTER_ADC_VOLTAGE_2_SCALE            1.0f
+#define INVERTER_ADC_VOLTAGE_2_SCALE            59.45f
 
 /** 第一路逆变电流采样偏置，单位为V。 */
-#define INVERTER_ADC_CURRENT_1_OFFSET_V         1.65f
+#define INVERTER_ADC_CURRENT_1_OFFSET_V         1.628f
 
 /** 第二路逆变电流采样偏置，单位为V。 */
-#define INVERTER_ADC_CURRENT_2_OFFSET_V         1.65f
+#define INVERTER_ADC_CURRENT_2_OFFSET_V         1.628f
 
 /** 第一路逆变电流采样增益，单位为V/A。 */
 #define INVERTER_ADC_CURRENT_1_GAIN_V_PER_A     0.08334f
@@ -195,5 +195,16 @@ void Inverter_ADC_ProcessFullTransfer(void);
  * @note           不停止ADC2 DMA，也不解除ADC1 DMA缓冲区绑定。
  */
 void Inverter_ADC_ClearData(void);
+
+/**
+ * @brief          初始化三相逆变的 ADC 采样及过流保护
+ * @param[in]      adc1_dma_buffer ADC1 DMA 缓冲区地址，
+ *                                 与 PFC 采样共用同一个 ADC1 DMA 缓冲区
+ * @retval         HAL_OK    初始化并启动成功
+ * @retval         HAL_ERROR ADC、模拟看门狗或 DMA 启动失败
+ * @note           必须在 MX_DMA_Init()、MX_ADC1_Init()、
+ *                 MX_ADC2_Init() 和 MX_HRTIM1_Init() 执行完成后调用
+ */
+HAL_StatusTypeDef Inverter_App_Init(uint16_t *adc1_dma_buffer);
 
 #endif /* INVERTER_ADC_H */

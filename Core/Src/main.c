@@ -66,20 +66,41 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+// 閲囨牱鍋忕疆鏍″噯鍑芥暟
+float Average_Update(float new_value)
+{
+  static uint64_t sample_count = 0U;
+  static double average = 0.0;
 
-// 采样偏置校准函数
- float Average_Update(float new_value)
- {
-   static uint64_t sample_count = 0U;
-   static double average = 0.0;
+  sample_count++;
 
-   sample_count++;
+  average += ((double)new_value - average) /
+             (double)sample_count;
 
-   average += ((double)new_value - average) /
-              (double)sample_count;
+  return (float)average;
+}
+float GetVoltageRms(float voltage_v)
+{
+  static float sum = 0.0f;
+  static float rms = 0.0f;
+  static uint16_t count = 0U;
 
-   return (float)average;
- }
+  sum += voltage_v * voltage_v;
+  count++;
+
+  /* 20kHz閲囨牱銆?0Hz浜ゆ祦锛氫竴涓懆鏈?00涓噰鏍风偣銆?*/
+  if (count >= 400U) {
+    rms = sqrtf(sum / 400.0f);
+    sum = 0.0f;
+    count = 0U;
+  }
+
+  return rms;
+}
+float input_voltage_rms_test;
+float average_value_v = 0.0f;
+float average_value_i = 0.0f;
+
 /* USER CODE END 0 */
 
 /**
@@ -142,10 +163,10 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    // average_value_v = Average_Update(pfc_adc_state.measurement.input_voltage_v );
+    // average_value_v = Average_Update(inverter_adc_state.measurement.voltage_2_v );
     // average_value_i = Average_Update(pfc_adc_state.measurement.input_current_a );
-    // input_voltage_rms_test = GetVoltageRms(pfc_adc_state.measurement.input_voltage_v);
-    // average_value_v = Average_Update(input_voltage_rms_test);
+    input_voltage_rms_test = GetVoltageRms(inverter_adc_state.measurement.voltage_2_v);
+    average_value_v = Average_Update(input_voltage_rms_test);
     PFC_App_Loop();
 
   }
