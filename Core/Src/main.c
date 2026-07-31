@@ -35,6 +35,7 @@
 #include "pfc_app.h"
 #include "inverter_adc.h"
 #include "inverter_adc_watchdog.h"
+#include "inverter_control.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -154,6 +155,11 @@ int main(void)
      Error_Handler();
    }
 
+   if (Inverter_Control_Init() != HAL_OK) {
+     (void)Inverter_ADC_Stop();
+     Error_Handler();
+   }
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -165,9 +171,10 @@ int main(void)
     /* USER CODE BEGIN 3 */
     // average_value_v = Average_Update(inverter_adc_state.measurement.voltage_2_v );
     // average_value_i = Average_Update(pfc_adc_state.measurement.input_current_a );
-    input_voltage_rms_test = GetVoltageRms(inverter_adc_state.measurement.voltage_2_v);
-    average_value_v = Average_Update(input_voltage_rms_test);
+    // input_voltage_rms_test = GetVoltageRms(inverter_adc_state.measurement.voltage_2_v);
+    // average_value_v = Average_Update(input_voltage_rms_test);
     PFC_App_Loop();
+    Inverter_Control_Service(pfc_adc_state.measurement.bus_voltage_v);
 
   }
   /* USER CODE END 3 */

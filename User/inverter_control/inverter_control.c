@@ -3,10 +3,16 @@
 #include <math.h>
 
 #include "inverter_adc_watchdog.h"
+#include "inverter_modulation.h"
+#include "inverter_svpwm.h"
 
 /** 三相逆变控制运行状态，可在调试器中观察。 */
 volatile Inverter_Control_StateTypeDef
     inverter_control_state;
+
+/** 当前选择的调制方式，可在调试器中观察。 */
+volatile Inverter_ModulationModeTypeDef
+    inverter_modulation_mode;
 
 /** 写1请求启动三相逆变。 */
 volatile uint8_t inverter_start_request;
@@ -43,6 +49,7 @@ static void Inverter_PR_Configure(
     float kp,
     float kr,
     float wc_rad_s,
+    float resonant_frequency_hz,
     float output_limit)
 {
     float transform_k;
@@ -51,7 +58,7 @@ static void Inverter_PR_Configure(
 
     transform_k = 2.0f * INVERTER_CONTROL_FREQ_HZ;
     w0_rad_s =
-        INVERTER_TWO_PI * INVERTER_OUTPUT_FREQ_HZ;
+        INVERTER_TWO_PI * resonant_frequency_hz;
 
     denominator =
         transform_k * transform_k +
@@ -90,6 +97,42 @@ static void Inverter_PR_Reset(
     controller->error_z2 = 0.0f;
     controller->resonant_z1 = 0.0f;
     controller->resonant_z2 = 0.0f;
+}
+
+/**
+ * @brief 按当前输出频率配置两路电压PR和两路电流PR
+ */
+static void Inverter_Control_ConfigurePRControllers(
+    float output_frequency_hz)
+{
+    Inverter_PR_Configure(
+        &inverter_control_state.voltage_pr_a,
+        INVERTER_VOLTAGE_PR_KP,
+        INVERTER_VOLTAGE_PR_KR,
+        INVERTER_VOLTAGE_PR_WC_RAD_S,
+        output_frequency_hz,
+        INVERTER_CURRENT_REFERENCE_LIMIT_A);
+    Inverter_PR_Configure(
+        &inverter_control_state.voltage_pr_c,
+        INVERTER_VOLTAGE_PR_KP,
+        INVERTER_VOLTAGE_PR_KR,
+        INVERTER_VOLTAGE_PR_WC_RAD_S,
+        output_frequency_hz,
+        INVERTER_CURRENT_REFERENCE_LIMIT_A);
+    Inverter_PR_Configure(
+        &inverter_control_state.current_pr_a,
+        INVERTER_CURRENT_PR_KP,
+        INVERTER_CURRENT_PR_KR,
+        INVERTER_CURRENT_PR_WC_RAD_S,
+        output_frequency_hz,
+        INVERTER_VOLTAGE_CORRECTION_LIMIT_V);
+    Inverter_PR_Configure(
+        &inverter_control_state.current_pr_c,
+        INVERTER_CURRENT_PR_KP,
+        INVERTER_CURRENT_PR_KR,
+        INVERTER_CURRENT_PR_WC_RAD_S,
+        output_frequency_hz,
+        INVERTER_VOLTAGE_CORRECTION_LIMIT_V);
 }
 
 /**
@@ -138,7 +181,7 @@ static float Inverter_PR_Run(
 }
 
 /**
- * @brief 初始化双PR、DPWM和Timer A/B/C计数器
+ * @brief 初始化双PR、两种调制器和Timer A/B/C计数器
  */
 HAL_StatusTypeDef Inverter_Control_Init(void)
 {
@@ -149,34 +192,31 @@ HAL_StatusTypeDef Inverter_Control_Init(void)
     inverter_start_request = 0U;
     inverter_stop_request = 0U;
     inverter_control_last_status = HAL_OK;
+    inverter_control_state.output_frequency_hz =
+        INVERTER_OUTPUT_FREQ_DEFAULT_HZ;
+    inverter_modulation_mode =
+        INVERTER_MODULATION_MODE_DEFAULT;
 
-    Inverter_PR_Configure(
-        &inverter_control_state.voltage_pr_a,
-        INVERTER_VOLTAGE_PR_KP,
-        INVERTER_VOLTAGE_PR_KR,
-        INVERTER_VOLTAGE_PR_WC_RAD_S,
-        INVERTER_CURRENT_REFERENCE_LIMIT_A);
-    Inverter_PR_Configure(
-        &inverter_control_state.voltage_pr_c,
-        INVERTER_VOLTAGE_PR_KP,
-        INVERTER_VOLTAGE_PR_KR,
-        INVERTER_VOLTAGE_PR_WC_RAD_S,
-        INVERTER_CURRENT_REFERENCE_LIMIT_A);
-    Inverter_PR_Configure(
-        &inverter_control_state.current_pr_a,
-        INVERTER_CURRENT_PR_KP,
-        INVERTER_CURRENT_PR_KR,
-        INVERTER_CURRENT_PR_WC_RAD_S,
-        INVERTER_VOLTAGE_CORRECTION_LIMIT_V);
-    Inverter_PR_Configure(
-        &inverter_control_state.current_pr_c,
-        INVERTER_CURRENT_PR_KP,
-        INVERTER_CURRENT_PR_KR,
-        INVERTER_CURRENT_PR_WC_RAD_S,
-        INVERTER_VOLTAGE_CORRECTION_LIMIT_V);
+    if ((inverter_modulation_mode !=
+         INVERTER_MODULATION_MODE_DPWM1) &&
+        (inverter_modulation_mode !=
+         INVERTER_MODULATION_MODE_SVPWM)) {
+        inverter_control_last_status = HAL_ERROR;
+        return HAL_ERROR;
+    }
+
+    Inverter_Control_ConfigurePRControllers(
+        inverter_control_state.output_frequency_hz);
 
     status = Inverter_DPWM_Init();
     if (status != HAL_OK) {
+        inverter_control_last_status = status;
+        return status;
+    }
+
+    status = Inverter_SVPWM_Init();
+    if (status != HAL_OK) {
+        Inverter_DPWM_Disable();
         inverter_control_last_status = status;
         return status;
     }
@@ -194,6 +234,78 @@ HAL_StatusTypeDef Inverter_Control_Init(void)
     inverter_start_request = 1U;
 #endif
 
+    return HAL_OK;
+}
+
+/**
+ * @brief 在停机状态选择30Hz或60Hz，并同步重算四个PR谐振系数
+ */
+HAL_StatusTypeDef Inverter_Control_SetOutputFrequency(
+    float output_frequency_hz)
+{
+    float selected_frequency_hz;
+
+    if (inverter_control_state.initialized == 0U) {
+        inverter_control_last_status = HAL_ERROR;
+        return HAL_ERROR;
+    }
+
+    if (inverter_control_state.enabled != 0U) {
+        inverter_control_last_status = HAL_BUSY;
+        return HAL_BUSY;
+    }
+
+    if (fabsf(output_frequency_hz -
+              INVERTER_OUTPUT_FREQ_LOW_HZ) <= 0.1f) {
+        selected_frequency_hz =
+            INVERTER_OUTPUT_FREQ_LOW_HZ;
+    } else if (fabsf(output_frequency_hz -
+                     INVERTER_OUTPUT_FREQ_HIGH_HZ) <= 0.1f) {
+        selected_frequency_hz =
+            INVERTER_OUTPUT_FREQ_HIGH_HZ;
+    } else {
+        inverter_control_last_status = HAL_ERROR;
+        return HAL_ERROR;
+    }
+
+    inverter_control_state.output_frequency_hz =
+        selected_frequency_hz;
+    Inverter_Control_ConfigurePRControllers(
+        selected_frequency_hz);
+    Inverter_Control_Reset();
+
+    inverter_control_last_status = HAL_OK;
+    return HAL_OK;
+}
+
+/**
+ * @brief 在停机状态选择DPWM1或连续SVPWM
+ */
+HAL_StatusTypeDef Inverter_Control_SetModulationMode(
+    Inverter_ModulationModeTypeDef modulation_mode)
+{
+    if (inverter_control_state.initialized == 0U) {
+        inverter_control_last_status = HAL_ERROR;
+        return HAL_ERROR;
+    }
+
+    if ((inverter_control_state.enabled != 0U) ||
+        (inverter_dpwm_state.outputs_enabled != 0U)) {
+        inverter_control_last_status = HAL_BUSY;
+        return HAL_BUSY;
+    }
+
+    if ((modulation_mode != INVERTER_MODULATION_MODE_DPWM1) &&
+        (modulation_mode != INVERTER_MODULATION_MODE_SVPWM)) {
+        inverter_control_last_status = HAL_ERROR;
+        return HAL_ERROR;
+    }
+
+    inverter_modulation_mode = modulation_mode;
+    Inverter_Control_Reset();
+    Inverter_SVPWM_Reset();
+
+    inverter_control_last_status = HAL_OK;
     return HAL_OK;
 }
 
@@ -287,7 +399,7 @@ void Inverter_Control_Service(float dc_bus_v)
 }
 
 /**
- * @brief 在ADC1全传输回调中执行一次双PR闭环和DPWM更新
+ * @brief 在ADC1全传输回调中执行一次双PR闭环和所选调制更新
  */
 void Inverter_Control_Update(float u_ab_v,
                              float u_bc_v,
@@ -443,14 +555,27 @@ void Inverter_Control_Update(float u_ab_v,
         2.0f * inverter_control_state.v_c_command_v /
         dc_bus_v;
 
-    Inverter_DPWM_Update(
-        inverter_control_state.m_a,
-        inverter_control_state.m_b,
-        inverter_control_state.m_c);
+    if (inverter_modulation_mode ==
+        INVERTER_MODULATION_MODE_DPWM1) {
+        Inverter_DPWM_Update(
+            inverter_control_state.m_a,
+            inverter_control_state.m_b,
+            inverter_control_state.m_c);
+    } else if (inverter_modulation_mode ==
+               INVERTER_MODULATION_MODE_SVPWM) {
+        Inverter_SVPWM_Update(
+            inverter_control_state.m_a,
+            inverter_control_state.m_b,
+            inverter_control_state.m_c);
+    } else {
+        Inverter_Control_Disable();
+        inverter_control_last_status = HAL_ERROR;
+        return;
+    }
 
     phase_step_rad =
         INVERTER_TWO_PI *
-        INVERTER_OUTPUT_FREQ_HZ /
+        inverter_control_state.output_frequency_hz /
         INVERTER_CONTROL_FREQ_HZ;
     inverter_control_state.phase_rad += phase_step_rad;
 
@@ -489,4 +614,5 @@ void Inverter_Control_Disable(void)
     Inverter_DPWM_Disable();
     inverter_control_state.enabled = 0U;
     Inverter_Control_Reset();
+    Inverter_SVPWM_Reset();
 }

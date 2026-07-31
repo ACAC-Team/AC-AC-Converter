@@ -1,5 +1,7 @@
 #include "inverter_adc.h"
 #include "inverter_adc_watchdog.h"
+#include "inverter_control.h"
+#include "pfc_adc.h"
 
 /** 三相逆变ADC采样对外运行数据。 */
 volatile Inverter_ADC_StateTypeDef inverter_adc_state;
@@ -16,7 +18,8 @@ static const volatile uint16_t *inverter_adc1_dma_buffer;
  * @note           必须在 MX_DMA_Init()、MX_ADC1_Init()、
  *                 MX_ADC2_Init() 和 MX_HRTIM1_Init() 执行完成后调用
  */
-HAL_StatusTypeDef Inverter_App_Init(uint16_t *adc1_dma_buffer)
+HAL_StatusTypeDef Inverter_App_Init(
+    const volatile uint16_t *adc1_dma_buffer)
 {
     /* 绑定 ADC1 DMA 缓冲区，并初始化三相逆变采样状态。 */
     if (Inverter_ADC_Init(adc1_dma_buffer) != HAL_OK) {
@@ -193,6 +196,17 @@ void Inverter_ADC_ProcessFullTransfer(void)
 
     inverter_adc_state.update_count++;
     inverter_adc_state.data_ready = 1U;
+
+    /*
+     * ADC1 Rank1~3半传输运行PFC；Rank4~6全传输到达后，
+     * ADC2两路电流也已同步搬运完成，在此执行一次20kHz逆变闭环。
+     */
+    Inverter_Control_Update(
+        inverter_adc_state.measurement.voltage_1_v,
+        inverter_adc_state.measurement.voltage_2_v,
+        inverter_adc_state.measurement.current_1_a,
+        inverter_adc_state.measurement.current_2_a,
+        pfc_adc_state.measurement.bus_voltage_v);
 }
 
 /**

@@ -168,33 +168,6 @@ HAL_StatusTypeDef Inverter_DPWM_Init(void)
     inverter_dpwm_state.compare_b_next = compare_half;
     inverter_dpwm_state.compare_c_next = compare_half;
 
-    status = HAL_HRTIM_WaveformSetOutputLevel(
-        &hhrtim1,
-        HRTIM_TIMERINDEX_TIMER_A,
-        HRTIM_OUTPUT_TA1,
-        HRTIM_OUTPUTLEVEL_INACTIVE);
-    if (status != HAL_OK) {
-        return status;
-    }
-
-    status = HAL_HRTIM_WaveformSetOutputLevel(
-        &hhrtim1,
-        HRTIM_TIMERINDEX_TIMER_B,
-        HRTIM_OUTPUT_TB1,
-        HRTIM_OUTPUTLEVEL_INACTIVE);
-    if (status != HAL_OK) {
-        return status;
-    }
-
-    status = HAL_HRTIM_WaveformSetOutputLevel(
-        &hhrtim1,
-        HRTIM_TIMERINDEX_TIMER_C,
-        HRTIM_OUTPUT_TC1,
-        HRTIM_OUTPUTLEVEL_INACTIVE);
-    if (status != HAL_OK) {
-        return status;
-    }
-
     Inverter_DPWM_WritePreload(
         compare_half,
         compare_half,
@@ -348,14 +321,9 @@ void Inverter_DPWM_Update(float m_a,
         minimum *= scale;
     }
 
-#if (INVERTER_DPWM_MODE == INVERTER_DPWM_MODE_MIN)
-    clamp_high = 0U;
-#elif (INVERTER_DPWM_MODE == INVERTER_DPWM_MODE_MAX)
-    clamp_high = 1U;
-#else
+    /* DPWM1：按当前三相最大值与最小值之和选择高侧或低侧钳位。 */
     clamp_high =
         ((maximum + minimum) >= 0.0f) ? 1U : 0U;
-#endif
 
     if (clamp_high != 0U) {
         zero_sequence = 1.0f - maximum;

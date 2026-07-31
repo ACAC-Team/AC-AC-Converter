@@ -10,17 +10,21 @@
 /** ADC1全传输回调和三相逆变控制更新频率，单位为Hz。 */
 #define INVERTER_CONTROL_FREQ_HZ              20000.0f
 
-/** 题目要求的三相输出基波频率，单位为Hz。 */
-#define INVERTER_OUTPUT_FREQ_HZ               30.0f
+/** 仿真模型当前默认的三相输出基波频率，单位为Hz。 */
+#define INVERTER_OUTPUT_FREQ_DEFAULT_HZ       44.963f
+
+/** 题目要求的两个可选输出频率，单位为Hz。 */
+#define INVERTER_OUTPUT_FREQ_LOW_HZ           30.0f
+#define INVERTER_OUTPUT_FREQ_HIGH_HZ          60.0f
 
 /** 题目要求的输出线电压有效值，单位为V RMS。 */
 #define INVERTER_LINE_VOLTAGE_TARGET_RMS_V    32.0f
 
 /** 输出线电压参考软启动斜率，单位为V RMS/s。 */
-#define INVERTER_LINE_VOLTAGE_SLEW_V_PER_S    16.0f
+#define INVERTER_LINE_VOLTAGE_SLEW_V_PER_S    3.0//16.0f
 
 /** 允许三相逆变闭环投入的最低直流母线电压。 */
-#define INVERTER_MIN_DC_BUS_V                 45.0f
+#define INVERTER_MIN_DC_BUS_V                 45.0f//45.0f
 
 /** 2π常数。 */
 #define INVERTER_TWO_PI                       6.28318530718f
@@ -36,41 +40,40 @@
  *
  * @note 默认关闭，调试器将inverter_start_request写1后才会使能六路PWM。
  */
-#ifndef INVERTER_CONTROL_AUTO_START
 #define INVERTER_CONTROL_AUTO_START           0U
-#endif
+
 
 /* ==================== 电压PR外环参数 ==================== */
 
 /** 电压PR外环比例增益，输出单位为A。 */
-#define INVERTER_VOLTAGE_PR_KP                0.020f
+#define INVERTER_VOLTAGE_PR_KP                0.050f
 
 /** 电压PR外环谐振增益，输出单位为A。 */
-#define INVERTER_VOLTAGE_PR_KR                0.500f
+#define INVERTER_VOLTAGE_PR_KR                10.0f
 
 /** 电压PR外环谐振带宽，单位为rad/s。 */
-#define INVERTER_VOLTAGE_PR_WC_RAD_S          5.0f
+#define INVERTER_VOLTAGE_PR_WC_RAD_S          1.0f
 
 /**
  * 电压外环允许的相电流参考绝对值，单位为A。
  *
  * @note 低于ADC2模拟看门狗的3A硬件限值。
  */
-#define INVERTER_CURRENT_REFERENCE_LIMIT_A    2.5f
+#define INVERTER_CURRENT_REFERENCE_LIMIT_A    5.0f
 
 /* ==================== 电流PR内环参数 ==================== */
 
 /** 电流PR内环比例增益，输出单位为V。 */
-#define INVERTER_CURRENT_PR_KP                4.0f
+#define INVERTER_CURRENT_PR_KP                2.0f
 
 /** 电流PR内环谐振增益，输出单位为V。 */
-#define INVERTER_CURRENT_PR_KR                20.0f
+#define INVERTER_CURRENT_PR_KR                80.0f
 
 /** 电流PR内环谐振带宽，单位为rad/s。 */
 #define INVERTER_CURRENT_PR_WC_RAD_S          5.0f
 
 /** 电流PR内环电压修正量绝对值上限，单位为V。 */
-#define INVERTER_VOLTAGE_CORRECTION_LIMIT_V   18.0f
+#define INVERTER_VOLTAGE_CORRECTION_LIMIT_V   80.0f
 
 /**
  * @brief 双线性变换离散准PR控制器
@@ -100,6 +103,7 @@ typedef struct
     Inverter_PR_ControllerTypeDef current_pr_c;
 
     float phase_rad;
+    float output_frequency_hz;
     float line_voltage_reference_rms_v;
     float dc_bus_v;
 
@@ -157,6 +161,19 @@ extern volatile HAL_StatusTypeDef inverter_control_last_status;
  * @note           必须在PFC_App_Init()启动HRTIM Master之后调用。
  */
 HAL_StatusTypeDef Inverter_Control_Init(void);
+
+/**
+ * @brief          在停机状态选择题目要求的30Hz或60Hz输出
+ * @param[in]      output_frequency_hz 仅接受30Hz或60Hz
+ * @retval         HAL_OK 频率和四个PR谐振系数已更新
+ * @retval         HAL_BUSY 逆变输出仍处于使能状态
+ * @retval         HAL_ERROR 未初始化或频率参数无效
+ *
+ * @note           切换顺序：RequestStop()，等待enabled清零，调用本函数，
+ *                 再RequestStart()。
+ */
+HAL_StatusTypeDef Inverter_Control_SetOutputFrequency(
+    float output_frequency_hz);
 
 /**
  * @brief          处理启动、停止和故障状态

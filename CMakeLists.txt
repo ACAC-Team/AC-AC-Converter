@@ -32,7 +32,8 @@ message("Build type: " ${CMAKE_BUILD_TYPE})
 enable_language(C ASM)
 
 # Create an executable object type
-add_executable(${CMAKE_PROJECT_NAME})
+add_executable(${CMAKE_PROJECT_NAME}
+        User/inverter_svpwm/inverter_svpwm.c)
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
@@ -63,8 +64,10 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     User/inverter_adc_watchdog/inverter_adc_watchdog.h
     User/inverter_control/inverter_control.c
     User/inverter_control/inverter_control.h
+    User/inverter_control/inverter_modulation.h
     User/inverter_dpwm/inverter_dpwm.c
     User/inverter_dpwm/inverter_dpwm.h
+        User/inverter_svpwm/inverter_svpwm.h
 )
 
 # Add include paths
@@ -80,6 +83,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/User/inverter_adc_watchdog
     ${CMAKE_CURRENT_SOURCE_DIR}/User/inverter_control
     ${CMAKE_CURRENT_SOURCE_DIR}/User/inverter_dpwm
+    ${CMAKE_CURRENT_SOURCE_DIR}/User/inverter_svpwm
 )
 
 # Add project symbols (macros)

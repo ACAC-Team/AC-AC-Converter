@@ -8,8 +8,7 @@
      HRTIM_OUTPUT_TC1 | HRTIM_OUTPUT_TC2)
 
 /** 三相逆变ADC看门狗对外运行状态。 */
-volatile Inverter_ADC_WatchdogStateTypeDef
-    inverter_adc_watchdog_state;
+volatile Inverter_ADC_WatchdogStateTypeDef inverter_adc_watchdog_state;
 
 /**
  * @brief          将浮点ADC计数限制到12位有效范围
@@ -128,7 +127,7 @@ HAL_StatusTypeDef Inverter_ADC_Watchdog_Init(void)
         ADC_TR1_AWDFILT,
         ((uint32_t)common_low << ADC_TR1_LT1_Pos) |
         ((uint32_t)common_high << ADC_TR1_HT1_Pos) |
-        ADC_AWD_FILTERING_NONE);
+        ADC_AWD_FILTERING_3SAMPLES);
 
     CLEAR_BIT(hadc2.State, HAL_ADC_STATE_AWD1);
     __HAL_ADC_CLEAR_FLAG(&hadc2, ADC_FLAG_AWD1);

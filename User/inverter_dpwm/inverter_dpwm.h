@@ -30,26 +30,14 @@
      HRTIM_TIMERID_TIMER_B | \
      HRTIM_TIMERID_TIMER_C)
 
-/* ==================== DPWM模式与边界参数 ==================== */
-
-/** DPWM1：按max+min的符号交替选择上母线或下母线钳位。 */
-#define INVERTER_DPWM_MODE_DPWM1       0U
-
-/** DPWMMIN：始终把最小相钳位到下母线。 */
-#define INVERTER_DPWM_MODE_MIN         1U
-
-/** DPWMMAX：始终把最大相钳位到上母线。 */
-#define INVERTER_DPWM_MODE_MAX         2U
+/* ==================== DPWM1边界参数 ==================== */
 
 /**
- * 运行时使用的DPWM模式。
+ * 本工程固定使用DPWM1：按max+min的符号交替选择上母线或下母线钳位。
  *
- * @note 默认使用DPWM1。若高侧驱动采用自举供电，应先确认连续钳位时间
- *       满足驱动电源要求，再使能功率输出。
+ * @note 若高侧驱动采用自举供电，应先确认连续钳位时间满足驱动电源要求，
+ *       再使能功率输出。
  */
-#ifndef INVERTER_DPWM_MODE
-#define INVERTER_DPWM_MODE INVERTER_DPWM_MODE_DPWM1
-#endif
 
 /**
  * 非钳位相CMP1与0、PER边界之间保留的最小计数。
@@ -58,12 +46,6 @@
  *       避免产生过窄脉冲。
  */
 #define INVERTER_DPWM_COMPARE_GUARD_COUNTS 24U
-
-#if ((INVERTER_DPWM_MODE != INVERTER_DPWM_MODE_DPWM1) && \
-     (INVERTER_DPWM_MODE != INVERTER_DPWM_MODE_MIN) && \
-     (INVERTER_DPWM_MODE != INVERTER_DPWM_MODE_MAX))
-#error "Invalid INVERTER_DPWM_MODE"
-#endif
 
 /**
  * @brief 当前DPWM钳位状态
@@ -134,7 +116,7 @@ HAL_StatusTypeDef Inverter_DPWM_StartCounters(void);
 HAL_StatusTypeDef Inverter_DPWM_Enable(void);
 
 /**
- * @brief          计算DPWM零序并预装载下一周期三相CMP1
+ * @brief          计算DPWM1零序并预装载下一周期三相CMP1
  * @param[in]      m_a A相归一化相电压指令
  * @param[in]      m_b B相归一化相电压指令
  * @param[in]      m_c C相归一化相电压指令

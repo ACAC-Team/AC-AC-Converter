@@ -6,7 +6,7 @@
 #include "inverter_adc.h"
 
 /** 两路逆变电流允许的绝对值上限，单位为A。 */
-#define INVERTER_ADC_CURRENT_LIMIT_A          3.0f
+#define INVERTER_ADC_CURRENT_LIMIT_A          8.0f
 
 /** 当前无三相逆变ADC看门狗故障。 */
 #define INVERTER_ADC_FAULT_NONE               0U

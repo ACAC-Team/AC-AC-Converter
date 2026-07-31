@@ -205,6 +205,7 @@ void Inverter_ADC_ClearData(void);
  * @note           必须在 MX_DMA_Init()、MX_ADC1_Init()、
  *                 MX_ADC2_Init() 和 MX_HRTIM1_Init() 执行完成后调用
  */
-HAL_StatusTypeDef Inverter_App_Init(uint16_t *adc1_dma_buffer);
+HAL_StatusTypeDef Inverter_App_Init(
+    const volatile uint16_t *adc1_dma_buffer);
 
 #endif /* INVERTER_ADC_H */
