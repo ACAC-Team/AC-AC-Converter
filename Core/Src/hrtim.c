@@ -96,24 +96,6 @@ void MX_HRTIM1_Init(void)
   {
     Error_Handler();
   }
-  pADCTriggerCfg.Trigger = HRTIM_ADCTRIGGEREVENT24_MASTER_CMP2;
-  if (HAL_HRTIM_ADCTriggerConfig(&hhrtim1, HRTIM_ADCTRIGGER_2, &pADCTriggerCfg) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_HRTIM_ADCPostScalerConfig(&hhrtim1, HRTIM_ADCTRIGGER_2, 0x0) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  pADCTriggerCfg.Trigger = HRTIM_ADCTRIGGEREVENT24_TIMERE_RESET;
-  if (HAL_HRTIM_ADCTriggerConfig(&hhrtim1, HRTIM_ADCTRIGGER_4, &pADCTriggerCfg) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_HRTIM_ADCPostScalerConfig(&hhrtim1, HRTIM_ADCTRIGGER_4, 0x0) != HAL_OK)
-  {
-    Error_Handler();
-  }
   pTimeBaseCfg.Period = 32000;
   pTimeBaseCfg.RepetitionCounter = 0;
   pTimeBaseCfg.PrescalerRatio = HRTIM_PRESCALERRATIO_MUL4;

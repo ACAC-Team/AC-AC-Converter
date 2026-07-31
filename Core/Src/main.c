@@ -78,28 +78,7 @@ void SystemClock_Config(void);
 
    return (float)average;
  }
- /* USER CODE END 0 */
- float average_value_v = 0.0f;
- float average_value_i = 0.0f;
-
-float GetVoltageRms(float voltage_v)
-{
-  static float sum = 0.0f;
-  static float rms = 0.0f;
-  static uint16_t count = 0U;
-
-  sum += voltage_v * voltage_v;
-  count++;
-
-  /* 20kHz采样、50Hz交流：一个周期400个采样点。 */
-  if (count >= 400U) {
-    rms = sqrtf(sum / 400.0f);
-    sum = 0.0f;
-    count = 0U;
-  }
-
-  return rms;
-}
+/* USER CODE END 0 */
 
 /**
   * @brief  The application entry point.
@@ -136,7 +115,6 @@ int main(void)
   MX_COMP3_Init();
   MX_DAC1_Init();
   MX_ADC1_Init();
-  MX_ADC3_Init();
   MX_COMP4_Init();
   MX_DAC2_Init();
   MX_DAC3_Init();
