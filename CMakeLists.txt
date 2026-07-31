@@ -46,7 +46,7 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
 
-    # PFC ADC sampling, hardware watchdog, control, PWM, and application modules
+    # PFC and inverter ADC, watchdog, control, PWM, and application modules
     User/pfc_adc/pfc_adc.c
     User/pfc_adc/pfc_adc.h
     User/pfc_adc_watchdog/pfc_adc_watchdog.c
@@ -57,6 +57,10 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     User/pfc_pwm/pfc_pwm.h
     User/pfc_app/pfc_app.c
     User/pfc_app/pfc_app.h
+    User/inverter_adc/inverter_adc.c
+    User/inverter_adc/inverter_adc.h
+    User/inverter_adc_watchdog/inverter_adc_watchdog.c
+    User/inverter_adc_watchdog/inverter_adc_watchdog.h
 )
 
 # Add include paths
@@ -68,6 +72,8 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/User/pfc_control
     ${CMAKE_CURRENT_SOURCE_DIR}/User/pfc_pwm
     ${CMAKE_CURRENT_SOURCE_DIR}/User/pfc_app
+    ${CMAKE_CURRENT_SOURCE_DIR}/User/inverter_adc
+    ${CMAKE_CURRENT_SOURCE_DIR}/User/inverter_adc_watchdog
 )
 
 # Add project symbols (macros)

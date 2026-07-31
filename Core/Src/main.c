@@ -33,6 +33,8 @@
 
 #include "pfc_adc.h"
 #include "pfc_app.h"
+#include "inverter_adc.h"
+#include "inverter_adc_watchdog.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -122,11 +124,14 @@ int main(void)
   MX_CORDIC_Init();
   /* USER CODE BEGIN 2 */
   // HAL_Delay(2000);
+   if (Inverter_App_Init(pfc_adc_state.dma.sample) != HAL_OK) {
+     Error_Handler();
+   }
 
-  if (PFC_App_Init() != HAL_OK) {
-    Error_Handler();
-  }
-
+   if (PFC_App_Init() != HAL_OK) {
+     (void)Inverter_ADC_Stop();
+     Error_Handler();
+   }
 
   /* USER CODE END 2 */
 
