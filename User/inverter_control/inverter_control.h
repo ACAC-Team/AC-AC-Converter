@@ -10,22 +10,25 @@
 /** ADC1全传输回调和三相逆变控制更新频率，单位为Hz。 */
 #define INVERTER_CONTROL_FREQ_HZ              20000.0f
 
-/** 仿真模型当前默认的三相输出基波频率，单位为Hz。 */
-#define INVERTER_OUTPUT_FREQ_DEFAULT_HZ       44.963f
+/** 题目要求的低输出频率，单位为Hz。 */
+#define INVERTER_OUTPUT_FREQ_LOW_HZ           35.55f
 
-/** 题目要求的两个可选输出频率，单位为Hz。 */
-#define INVERTER_OUTPUT_FREQ_LOW_HZ           30.0f
-#define INVERTER_OUTPUT_FREQ_HIGH_HZ          60.0f
+/** 题目要求的高输出频率，单位为Hz。 */
+#define INVERTER_OUTPUT_FREQ_HIGH_HZ          70.5f
+
+/** 上电默认输出频率，默认使用低频。 */
+#define INVERTER_OUTPUT_FREQ_DEFAULT_HZ       \
+    INVERTER_OUTPUT_FREQ_LOW_HZ
 
 /** 题目要求的输出线电压有效值，单位为V RMS。 */
-#define INVERTER_LINE_VOLTAGE_TARGET_RMS_V    32.0f
+#define INVERTER_LINE_VOLTAGE_TARGET_RMS_V    32.0f//32.0f
 
 /** 输出线电压参考软启动斜率，单位为V RMS/s。 */
-#define INVERTER_LINE_VOLTAGE_SLEW_V_PER_S    3.0//16.0f
+#define INVERTER_LINE_VOLTAGE_SLEW_V_PER_S    16.0//16.0f
 
 /** 允许三相逆变闭环投入的最低直流母线电压。 */
-#define INVERTER_MIN_DC_BUS_V                 45.0f//45.0f
-
+#define INVERTER_START_DC_BUS_V               55.0f
+#define INVERTER_STOP_DC_BUS_V                45.0f
 /** 2π常数。 */
 #define INVERTER_TWO_PI                       6.28318530718f
 
@@ -40,13 +43,13 @@
  *
  * @note 默认关闭，调试器将inverter_start_request写1后才会使能六路PWM。
  */
-#define INVERTER_CONTROL_AUTO_START           0U
+#define INVERTER_CONTROL_AUTO_START           1U // 三相逆变启动
 
 
 /* ==================== 电压PR外环参数 ==================== */
 
 /** 电压PR外环比例增益，输出单位为A。 */
-#define INVERTER_VOLTAGE_PR_KP                0.050f
+#define INVERTER_VOLTAGE_PR_KP               0.05 //0.050f
 
 /** 电压PR外环谐振增益，输出单位为A。 */
 #define INVERTER_VOLTAGE_PR_KR                10.0f
@@ -59,7 +62,7 @@
  *
  * @note 低于ADC2模拟看门狗的3A硬件限值。
  */
-#define INVERTER_CURRENT_REFERENCE_LIMIT_A    5.0f
+#define INVERTER_CURRENT_REFERENCE_LIMIT_A    6.0f
 
 /* ==================== 电流PR内环参数 ==================== */
 
@@ -147,6 +150,9 @@ extern volatile Inverter_Control_StateTypeDef
 /** 写1请求启动三相逆变，服务函数处理后自动清零。 */
 extern volatile uint8_t inverter_start_request;
 
+/** 写1请求在低频和高频之间切换，服务函数处理后自动清零。 */
+extern volatile uint8_t inverter_frequency_toggle_request;
+
 /** 写1请求停止三相逆变，服务函数处理后自动清零。 */
 extern volatile uint8_t inverter_stop_request;
 
@@ -212,6 +218,11 @@ void Inverter_Control_RequestStart(void);
  */
 void Inverter_Control_RequestStop(void);
 
+/**
+ * @brief          请求在低频和高频之间切换
+ * @note           运行中调用时，服务函数会自动停PWM、改频并重新启动。
+ */
+void Inverter_Control_RequestFrequencyToggle(void);
 /**
  * @brief          立即关闭三相逆变六路输出并复位控制器
  */

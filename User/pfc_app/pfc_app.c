@@ -111,7 +111,7 @@ HAL_StatusTypeDef PFC_App_Init(void)
     pfc_app_last_status = HAL_OK;
     /* 所有初始化、校准和保护检查完成后才提交启动请求。 */
     // HAL_Delay(2000);
-    pfc_start_request = 0U;
+    pfc_start_request = 1U;
 
     return HAL_OK;
 }

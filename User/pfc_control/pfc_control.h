@@ -104,7 +104,7 @@ PFC_CONTROL_MODE_PFC
 
 
 /** 允许计算调制度的最低母线电压，单位为V。 */
-#define PFC_MIN_BUS_V 1.0f
+#define PFC_MIN_BUS_V 15.0f
 
 /** 计算PR控制器系数使用的2π常数。 */
 #define PFC_TWO_PI 6.28318530718f
@@ -125,7 +125,7 @@ PFC_CONTROL_MODE_PFC
 #define PFC_BUS_PI_KI 15.0f
 
 /** 电压环和单电流环允许的最大电流有效值给定，单位为A RMS。 */
-#define PFC_CURRENT_REF_MAX_RMS_A 4.0f
+#define PFC_CURRENT_REF_MAX_RMS_A 7.5f
 
 /* ==================== 输入电流PR内环参数 ==================== */
 
@@ -139,7 +139,7 @@ PFC_CONTROL_MODE_PFC
 #define PFC_CURRENT_PR_WC_RAD_S 5.0f
 
 /** 输入电流PR控制器输出电压绝对值上限，单位为V。 */
-#define PFC_CURRENT_PR_OUTPUT_LIMIT_V 12.0f
+#define PFC_CURRENT_PR_OUTPUT_LIMIT_V 18.0f
 
 /**
  * PFC归一化调制度绝对值上限。

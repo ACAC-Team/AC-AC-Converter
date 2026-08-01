@@ -23,6 +23,9 @@ volatile uint8_t inverter_stop_request;
 /** 三相逆变控制最近一次HAL执行状态。 */
 volatile HAL_StatusTypeDef inverter_control_last_status;
 
+/** 写1请求在低频和高频之间切换。 */
+volatile uint8_t inverter_frequency_toggle_request;
+
 /**
  * @brief 将浮点数限制到指定范围
  */
@@ -191,6 +194,7 @@ HAL_StatusTypeDef Inverter_Control_Init(void)
         (Inverter_Control_StateTypeDef){0};
     inverter_start_request = 0U;
     inverter_stop_request = 0U;
+    inverter_frequency_toggle_request = 0U;
     inverter_control_last_status = HAL_OK;
     inverter_control_state.output_frequency_hz =
         INVERTER_OUTPUT_FREQ_DEFAULT_HZ;
@@ -355,8 +359,50 @@ void Inverter_Control_Service(float dc_bus_v)
         Inverter_Control_Disable();
         inverter_start_request = 0U;
         inverter_stop_request = 0U;
+        inverter_frequency_toggle_request = 0U;
         inverter_control_last_status = HAL_ERROR;
         return;
+    }
+
+    /*
+ * 按键只提交切频请求，实际停机、改频和重启统一在这里完成。
+ * 这样运行中不会直接调用SetOutputFrequency()而得到HAL_BUSY。
+ */
+    if (inverter_frequency_toggle_request != 0U) {
+        uint8_t restart_after_switch;
+        float target_frequency_hz;
+
+        inverter_frequency_toggle_request = 0U;
+
+        restart_after_switch =
+            inverter_control_state.enabled;
+
+        if (inverter_control_state.output_frequency_hz <
+            ((INVERTER_OUTPUT_FREQ_LOW_HZ +
+              INVERTER_OUTPUT_FREQ_HIGH_HZ) * 0.5f)) {
+
+            target_frequency_hz =
+                INVERTER_OUTPUT_FREQ_HIGH_HZ;
+              } else {
+                  target_frequency_hz =
+                      INVERTER_OUTPUT_FREQ_LOW_HZ;
+              }
+
+        if (restart_after_switch != 0U) {
+            Inverter_Control_Disable();
+        }
+
+        status = Inverter_Control_SetOutputFrequency(
+            target_frequency_hz);
+
+        if (status != HAL_OK) {
+            inverter_control_last_status = status;
+            return;
+        }
+
+        if (restart_after_switch != 0U) {
+            inverter_start_request = 1U;
+        }
     }
 
     if (inverter_stop_request != 0U) {
@@ -375,7 +421,7 @@ void Inverter_Control_Service(float dc_bus_v)
      * 保留启动请求，直到PFC把直流母线建立到安全阈值。
      * 这样自动启动和调试器手动启动都不会在母线过低时误投入。
      */
-    if (dc_bus_v < INVERTER_MIN_DC_BUS_V) {
+    if (dc_bus_v <INVERTER_START_DC_BUS_V) {
         inverter_control_last_status = HAL_BUSY;
         return;
     }
@@ -442,7 +488,7 @@ void Inverter_Control_Update(float u_ab_v,
     }
 
     if ((Inverter_ADC_Watchdog_IsFaulted() != 0U) ||
-        (dc_bus_v < INVERTER_MIN_DC_BUS_V)) {
+        (dc_bus_v < INVERTER_STOP_DC_BUS_V )) {
         Inverter_Control_Disable();
         inverter_control_last_status = HAL_ERROR;
         return;
@@ -544,7 +590,6 @@ void Inverter_Control_Update(float u_ab_v,
     inverter_control_state.v_b_command_v =
         -inverter_control_state.v_a_command_v -
         inverter_control_state.v_c_command_v;
-
     inverter_control_state.m_a =
         2.0f * inverter_control_state.v_a_command_v /
         dc_bus_v;
@@ -604,6 +649,14 @@ void Inverter_Control_RequestStop(void)
 {
     inverter_start_request = 0U;
     inverter_stop_request = 1U;
+}
+
+/**
+ * @brief 请求在低频和高频之间切换
+ */
+void Inverter_Control_RequestFrequencyToggle(void)
+{
+    inverter_frequency_toggle_request = 1U;
 }
 
 /**

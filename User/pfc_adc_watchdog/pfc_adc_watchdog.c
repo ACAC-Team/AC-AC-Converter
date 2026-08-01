@@ -87,7 +87,7 @@ HAL_StatusTypeDef PFC_ADC_Watchdog_Init(void)
         ADC_TR1_AWDFILT,
         (current_low_count << ADC_TR1_LT1_Pos) |
         (current_high_count << ADC_TR1_HT1_Pos) |
-        ADC_AWD_FILTERING_NONE);
+        ADC_AWD_FILTERING_3SAMPLES);//看门狗触发次数
 
     /* 清除配置前可能残留的AWD1标志。 */
     __HAL_ADC_CLEAR_FLAG(
@@ -120,7 +120,7 @@ HAL_StatusTypeDef PFC_ADC_Watchdog_Init(void)
         PFC_ADC_VBUS_V_PER_COUNT);
 
     watchdog.FilteringConfig =
-        ADC_AWD_FILTERING_NONE;
+        ADC_AWD_FILTERING_3SAMPLES;
 
     status = HAL_ADC_AnalogWDGConfig(
         &hadc1,
