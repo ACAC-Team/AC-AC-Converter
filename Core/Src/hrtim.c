@@ -354,6 +354,7 @@ void MX_HRTIM1_Init(void)
   {
     Error_Handler();
   }
+  pTimeBaseCfg.Period = 32000;
   if (HAL_HRTIM_TimeBaseConfig(&hhrtim1, HRTIM_TIMERINDEX_TIMER_E, &pTimeBaseCfg) != HAL_OK)
   {
     Error_Handler();
@@ -368,7 +369,7 @@ void MX_HRTIM1_Init(void)
   {
     Error_Handler();
   }
-  pCompareCfg.CompareValue = 12800;
+  pCompareCfg.CompareValue = 25600;
   if (HAL_HRTIM_WaveformCompareConfig(&hhrtim1, HRTIM_TIMERINDEX_TIMER_E, HRTIM_COMPAREUNIT_1, &pCompareCfg) != HAL_OK)
   {
     Error_Handler();

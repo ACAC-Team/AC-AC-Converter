@@ -11,10 +11,10 @@
 #define INVERTER_CONTROL_FREQ_HZ              20000.0f
 
 /** 题目要求的低输出频率，单位为Hz。 */
-#define INVERTER_OUTPUT_FREQ_LOW_HZ           35.55f
+#define INVERTER_OUTPUT_FREQ_LOW_HZ           30.0f//35.55f
 
 /** 题目要求的高输出频率，单位为Hz。 */
-#define INVERTER_OUTPUT_FREQ_HIGH_HZ          70.5f
+#define INVERTER_OUTPUT_FREQ_HIGH_HZ          60.0f//70.5f
 
 /** 上电默认输出频率，默认使用低频。 */
 #define INVERTER_OUTPUT_FREQ_DEFAULT_HZ       \
@@ -49,10 +49,10 @@
 /* ==================== 电压PR外环参数 ==================== */
 
 /** 电压PR外环比例增益，输出单位为A。 */
-#define INVERTER_VOLTAGE_PR_KP               0.05 //0.050f
+#define INVERTER_VOLTAGE_PR_KP               0.2 //0.050f
 
 /** 电压PR外环谐振增益，输出单位为A。 */
-#define INVERTER_VOLTAGE_PR_KR                10.0f
+#define INVERTER_VOLTAGE_PR_KR                20.0f
 
 /** 电压PR外环谐振带宽，单位为rad/s。 */
 #define INVERTER_VOLTAGE_PR_WC_RAD_S          1.0f
@@ -67,10 +67,10 @@
 /* ==================== 电流PR内环参数 ==================== */
 
 /** 电流PR内环比例增益，输出单位为V。 */
-#define INVERTER_CURRENT_PR_KP                2.0f
+#define INVERTER_CURRENT_PR_KP                -2.0f
 
 /** 电流PR内环谐振增益，输出单位为V。 */
-#define INVERTER_CURRENT_PR_KR                80.0f
+#define INVERTER_CURRENT_PR_KR                -80.0f
 
 /** 电流PR内环谐振带宽，单位为rad/s。 */
 #define INVERTER_CURRENT_PR_WC_RAD_S          5.0f

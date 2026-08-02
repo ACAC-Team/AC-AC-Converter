@@ -34,13 +34,13 @@
 #define INVERTER_ADC_VOLTAGE_1_OFFSET_V         1.749f
 
 /** 第二路逆变电压采样偏置，单位为V。 */
-#define INVERTER_ADC_VOLTAGE_2_OFFSET_V         1.818f
+#define INVERTER_ADC_VOLTAGE_2_OFFSET_V         1.7582f
 
 /** 第一路逆变电压采样还原倍率：实际电压/ADC引脚电压。 */
 #define INVERTER_ADC_VOLTAGE_1_SCALE            60.51f
 
 /** 第二路逆变电压采样还原倍率：实际电压/ADC引脚电压。 */
-#define INVERTER_ADC_VOLTAGE_2_SCALE            59.45f
+#define INVERTER_ADC_VOLTAGE_2_SCALE            59.84f
 
 /** 第一路逆变电流采样偏置，单位为V。 */
 #define INVERTER_ADC_CURRENT_1_OFFSET_V         1.628f

@@ -88,7 +88,6 @@ float GetVoltageRms(float voltage_v)
   sum += voltage_v * voltage_v;
   count++;
 
-  /* 20kHz閲囨牱銆?0Hz浜ゆ祦锛氫竴涓懆鏈?00涓噰鏍风偣銆?*/
   if (count >= 400U) {
     rms = sqrtf(sum / 400.0f);
     sum = 0.0f;
@@ -111,14 +110,6 @@ typedef enum
     INVERTER_FREQ_SWITCH_WAIT_STOP
 } Inverter_FrequencySwitchStateTypeDef;
 
-/** 频率切换状态。 */
-static Inverter_FrequencySwitchStateTypeDef
-    inverter_frequency_switch_state =
-        INVERTER_FREQ_SWITCH_IDLE;
-
-/** 等待设置的新目标频率，单位为Hz。 */
-static float inverter_pending_frequency_hz =
-    INVERTER_OUTPUT_FREQ_LOW_HZ;
 
 /** 最近一次频率切换执行结果，供调试器观察。 */
 volatile HAL_StatusTypeDef
@@ -159,77 +150,6 @@ static uint8_t KEY_FrequencyToggle_IsPressed(void)
     return 0U;
 }
 
-/**
- * @brief          处理PA4按键控制的逆变输出频率切换
- * @note           每按一次，在35.55Hz与70.5Hz之间切换
- */
-static void Inverter_FrequencyKey_Service(void)
-{
-    switch (inverter_frequency_switch_state) {
-        case INVERTER_FREQ_SWITCH_IDLE:
-
-            if (KEY_FrequencyToggle_IsPressed() != 0U) {
-
-                /*
-                 * 当前处于低频时，下一目标切换为高频；
-                 * 当前处于高频时，下一目标切换为低频。
-                 */
-                if (inverter_control_state.output_frequency_hz <
-                    ((INVERTER_OUTPUT_FREQ_LOW_HZ +
-                      INVERTER_OUTPUT_FREQ_HIGH_HZ) * 0.5f)) {
-
-                    inverter_pending_frequency_hz =
-                        INVERTER_OUTPUT_FREQ_HIGH_HZ;
-                } else {
-                    inverter_pending_frequency_hz =
-                        INVERTER_OUTPUT_FREQ_LOW_HZ;
-                }
-
-                /*
-                 * 当前控制代码不允许运行中修改PR谐振频率，
-                 * 因此先提交停止请求。
-                 */
-                Inverter_Control_RequestStop();
-
-                inverter_frequency_switch_state =
-                    INVERTER_FREQ_SWITCH_WAIT_STOP;
-            }
-            break;
-
-        case INVERTER_FREQ_SWITCH_WAIT_STOP:
-
-            /*
-             * 等待Inverter_Control_Service()真正关闭PWM，
-             * 并处理完停止请求。
-             */
-            if ((inverter_control_state.enabled == 0U) &&
-                (inverter_stop_request == 0U)) {
-
-                inverter_frequency_switch_status =
-                    Inverter_Control_SetOutputFrequency(
-                        inverter_pending_frequency_hz);
-
-                if (inverter_frequency_switch_status ==
-                    HAL_OK) {
-
-                    /*
-                     * 设置频率成功后重新提交启动请求。
-                     * 如果母线未达到启动电压，启动请求会被保留。
-                     */
-                    Inverter_Control_RequestStart();
-                }
-
-                inverter_frequency_switch_state =
-                    INVERTER_FREQ_SWITCH_IDLE;
-            }
-            break;
-
-        default:
-            inverter_frequency_switch_state =
-                INVERTER_FREQ_SWITCH_IDLE;
-            break;
-    }
-}
 /* USER CODE END 0 */
 
 /**
@@ -299,7 +219,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    // average_value_v = Average_Update(inverter_adc_state.measurement.current_1_a );
+
     // average_value_i = Average_Update(pfc_adc_state.measurement.input_current_a );
     // average_value_v = Average_Update(input_voltage_rms_test);
     PFC_App_Loop();
@@ -307,7 +227,8 @@ int main(void)
           Inverter_Control_RequestFrequencyToggle();
       }
     Inverter_Control_Service(pfc_adc_state.measurement.bus_voltage_v);
-    // input_voltage_rms_test = GetVoltageRms(inverter_adc_state.measurement.current_1_a);
+    // input_voltage_rms_test = GetVoltageRms(inverter_adc_state.measurement.voltage_2_v);
+    // average_value_v = Average_Update(input_voltage_rms_test );
 
   }
   /* USER CODE END 3 */
