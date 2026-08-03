@@ -195,11 +195,49 @@ int main(void)
   /* USER CODE BEGIN 2 */
   HAL_Delay(2000);
 
+  /* 任何ADC采样和校准开始前，先强制关闭三相逆变六路功率输出。 */
+  Inverter_DPWM_Disable();
+
   if (Inverter_App_Init(pfc_adc_state.dma.sample) != HAL_OK) {
     Error_Handler();
   }
 
+   /*
+    * 只启动ADC1 DMA和HRTIM采样时基。
+    * PFC控制器、PFC启动请求以及全部功率输出此时均未启用。
+    */
+   if (PFC_App_StartSamplingForCalibration() != HAL_OK) {
+     (void)Inverter_ADC_Stop();
+     Error_Handler();
+   }
+
+   /* 只在本次上电启动阶段校准v1、v2、a1、a2四路零点。 */
+   if (Inverter_ADC_WaitForZeroCalibration(
+           INVERTER_ADC_ZERO_CALIB_TIMEOUT_MS) != HAL_OK) {
+     (void)PFC_ADC_Stop();
+     (void)Inverter_ADC_Stop();
+     Error_Handler();
+   }
+
+   /* 停止ADC2后写入a1、a2动态保护阈值，再恢复采样和看门狗。 */
+   if (Inverter_ADC_Stop() != HAL_OK) {
+     (void)PFC_ADC_Stop();
+     Error_Handler();
+   }
+
+   if (Inverter_ADC_Watchdog_Init() != HAL_OK) {
+     (void)PFC_ADC_Stop();
+     Error_Handler();
+   }
+
+   if (Inverter_ADC_Start() != HAL_OK) {
+     (void)PFC_ADC_Stop();
+     Error_Handler();
+   }
+
+   /* 四路校准及逆变保护完成后，才正式初始化PFC。 */
    if (PFC_App_Init() != HAL_OK) {
+     (void)PFC_ADC_Stop();
      (void)Inverter_ADC_Stop();
      Error_Handler();
    }
@@ -220,7 +258,7 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-    // average_value_i = Average_Update(pfc_adc_state.measurement.input_current_a );
+    // average_value_i = Average_Update(inverter_adc_state.measurement.current_2_a );
     // average_value_v = Average_Update(input_voltage_rms_test);
     PFC_App_Loop();
       if (KEY_FrequencyToggle_IsPressed() != 0U) {
@@ -228,7 +266,7 @@ int main(void)
       }
     Inverter_Control_Service(pfc_adc_state.measurement.bus_voltage_v);
     // input_voltage_rms_test = GetVoltageRms(inverter_adc_state.measurement.voltage_2_v);
-    // average_value_v = Average_Update(input_voltage_rms_test );
+    average_value_v = Average_Update(inverter_control_state.line_voltage_ab_rms_v);
 
   }
   /* USER CODE END 3 */

@@ -16,37 +16,41 @@ volatile HAL_StatusTypeDef pfc_app_last_status;
 /** PFC_App_Init()已经成功完成标志。 */
 static uint8_t pfc_app_initialized;
 
+/** 校准用ADC DMA和HRTIM采样时基已经安全启动标志。 */
+static uint8_t pfc_calibration_sampling_started;
+
 /**
- * @brief          初始化完整PFC应用
+ * @brief          为逆变上电零点校准启动安全采样
  * @param[in]      none
- * @retval         HAL_OK 初始化成功，PWM功率输出保持关闭
- * @retval         HAL_TIMEOUT ADC零点校准超时
- * @retval         其他HAL状态 底层模块初始化失败
+ * @retval         HAL_OK 启动成功，全部功率输出保持关闭
+ * @retval         HAL_BUSY 安全采样已经启动过
+ * @retval         其他HAL状态 底层模块启动失败
  */
-HAL_StatusTypeDef PFC_App_Init(void)
+HAL_StatusTypeDef PFC_App_StartSamplingForCalibration(void)
 {
     HAL_StatusTypeDef status;
-    // uint32_t calibration_start_tick;
+
+    if (pfc_calibration_sampling_started != 0U) {
+        return HAL_BUSY;
+    }
 
     pfc_start_request = 0U;
     pfc_stop_request = 0U;
     pfc_app_last_status = HAL_OK;
     pfc_app_initialized = 0U;
 
-    /*
-     * 必须在HRTIM计数器启动前建立安全比较值。
-     * 此时TE1、TE2、TF1、TF2四路功率输出保持关闭。
-     */
+    /* 校准阶段不允许ADC1看门狗产生PFC故障或打开功率输出。 */
+    PFC_ADC_Watchdog_Disable();
+    PFC_ADC_Watchdog_ClearFault();
+
+    /* 先建立安全比较值，并通过ODISR保持PFC四路功率输出关闭。 */
     status = PFC_PWM_Init();
     if (status != HAL_OK) {
         pfc_app_last_status = status;
         return status;
     }
 
-    /*
-     * 先启动ADC DMA，再启动HRTIM计数器。
-     * ADC会等待HRTIM_TRG1触发，不会在此处自由运行。
-     */
+    /* ADC1 DMA先进入等待HRTIM_TRG1的状态。 */
     status = PFC_ADC_SamplingStart();
     if (status != HAL_OK) {
         pfc_app_last_status = status;
@@ -54,8 +58,17 @@ HAL_StatusTypeDef PFC_App_Init(void)
     }
 
     /*
-     * 同步启动Master、Timer E和Timer F。
-     * Master负责下一周期同步装载，Timer F负责触发ADC采样。
+     * 校准阶段只保留ADC1 DMA全传输中断来处理v1、v2、a1、a2。
+     * 暂停半传输中断，避免正式PFC初始化前运行PFC采样和控制回调。
+     * PFC_ADC_Watchdog_Init()稍后重启ADC1 DMA时会恢复半传输中断。
+     */
+    __HAL_DMA_DISABLE_IT(
+        hadc1.DMA_Handle,
+        DMA_IT_HT);
+
+    /*
+     * 只启动Master和Timer E/F计数器来产生采样触发；
+     * TE1、TE2、TF1、TF2功率输出仍由ODISR保持关闭。
      */
     status = PFC_PWM_StartCounters();
     if (status != HAL_OK) {
@@ -64,26 +77,43 @@ HAL_StatusTypeDef PFC_App_Init(void)
         return status;
     }
 
-    // /*
-    //  * 等待输入电压和输入电流零点校准。
-    //  * 校准期间必须保持交流输入、电感电流和PWM输出为0。
-    //  */
-    // calibration_start_tick = HAL_GetTick();
-    // while (pfc_adc_state.calibration.ready == 0U) {
-    //     if ((HAL_GetTick() - calibration_start_tick) >=
-    //         PFC_APP_CALIBRATION_TIMEOUT_MS) {
-    //         PFC_PWM_Disable();
-    //         (void)PFC_ADC_Stop();
-    //         pfc_app_last_status = HAL_TIMEOUT;
-    //         return HAL_TIMEOUT;
-    //     }
-    // }
+    pfc_calibration_sampling_started = 1U;
+    pfc_app_last_status = HAL_OK;
+
+    return HAL_OK;
+}
+
+/**
+ * @brief          完成PFC看门狗、控制器和应用状态初始化
+ * @param[in]      none
+ * @retval         HAL_OK 初始化成功，PWM功率输出保持关闭
+ * @retval         其他HAL状态 底层模块初始化失败
+ */
+HAL_StatusTypeDef PFC_App_Init(void)
+{
+    HAL_StatusTypeDef status;
+
+    pfc_start_request = 0U;
+    pfc_stop_request = 0U;
+    pfc_app_last_status = HAL_OK;
+    pfc_app_initialized = 0U;
+
+    if (pfc_calibration_sampling_started == 0U) {
+        pfc_app_last_status = HAL_ERROR;
+        return HAL_ERROR;
+    }
+
+    /* 校准采样阶段若出现ADC错误，不允许继续初始化或启动PFC。 */
+    if (pfc_adc_fault != PFC_ADC_FAULT_NONE) {
+        PFC_PWM_Disable();
+        pfc_app_last_status = HAL_ERROR;
+        return HAL_ERROR;
+    }
 
     /*
-     * 先清除上电软件故障标志，再配置输入过流和母线过压
-     * ADC硬件看门狗。配置过程会停止并重新启动ADC DMA。
+     * 四路逆变零点已经完成，现在才配置PFC输入过流和母线过压
+     * ADC硬件看门狗。配置过程会停止并重新启动ADC1 DMA。
      */
-    PFC_ADC_Watchdog_ClearFault();
     status = PFC_ADC_Watchdog_Init();
     if (status != HAL_OK) {
         PFC_PWM_Disable();

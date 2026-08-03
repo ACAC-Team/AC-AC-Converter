@@ -34,16 +34,29 @@ extern volatile uint8_t pfc_stop_request;
 extern volatile HAL_StatusTypeDef pfc_app_last_status;
 
 /**
- * @brief          初始化完整PFC应用
+ * @brief          为逆变上电零点校准启动安全采样
+ * @param[in]      none
+ * @retval         HAL_OK ADC DMA和HRTIM采样时基已经启动
+ * @retval         HAL_BUSY 安全采样已经启动过
+ * @retval         其他HAL状态 底层模块启动失败
+ *
+ * @note           本函数关闭ADC1看门狗，初始化安全比较值并启动
+ *                 ADC1 DMA及HRTIM Master、Timer E/F计数器。
+ * @note           不初始化PFC控制器、不提交PFC启动请求，也不使能
+ *                 TE1、TE2、TF1、TF2功率输出。
+ */
+HAL_StatusTypeDef PFC_App_StartSamplingForCalibration(void);
+
+/**
+ * @brief          完成PFC看门狗、控制器和应用状态初始化
  * @param[in]      none
  * @retval         HAL_OK 初始化成功，系统已经就绪但PWM功率输出仍然关闭
- * @retval         HAL_TIMEOUT ADC零点校准超时
  * @retval         其他HAL状态 底层模块初始化失败
  *
- * @note           必须在全部CubeMX生成的MX_xxx_Init()之后调用。
- *                 本函数会启动HRTIM Master、Timer E/F计数器和ADC DMA，
- *                 但不会使能TE1、TE2、TF1、TF2功率输出。
- *                 ADC零点校准期间交流输入和电感电流必须为0。
+ * @note           必须在PFC_App_StartSamplingForCalibration()成功、
+ *                 逆变四路零点校准完成且逆变电流看门狗恢复后调用。
+ * @note           本函数才会配置PFC看门狗、初始化PFC控制器并提交
+ *                 pfc_start_request；功率输出仍由主循环稍后使能。
  */
 HAL_StatusTypeDef PFC_App_Init(void);
 

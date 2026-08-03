@@ -26,6 +26,24 @@ volatile HAL_StatusTypeDef inverter_control_last_status;
 /** 写1请求在低频和高频之间切换。 */
 volatile uint8_t inverter_frequency_toggle_request;
 
+/** 主循环1kHz后台线电压RMS累加器。 */
+typedef struct
+{
+    float sum_ab_v;
+    float sum_bc_v;
+    float sum_ca_v;
+    float square_sum_ab_v2;
+    float square_sum_bc_v2;
+    float square_sum_ca_v2;
+    uint32_t sample_count;
+    uint32_t last_sample_tick_ms;
+    uint32_t window_start_tick_ms;
+    uint8_t tick_initialized;
+} Inverter_LineVoltageRmsRuntimeTypeDef;
+
+static Inverter_LineVoltageRmsRuntimeTypeDef
+    inverter_line_voltage_rms_runtime;
+
 /**
  * @brief 将浮点数限制到指定范围
  */
@@ -42,6 +60,269 @@ static float Inverter_Control_Clamp(float value,
     }
 
     return value;
+}
+
+/**
+ * @brief 根据30Hz/60Hz输出频率选择内部线电压RMS指令
+ */
+static float Inverter_Control_SelectLineVoltageTargetRms(
+    float output_frequency_hz)
+{
+    if (output_frequency_hz <
+        ((INVERTER_OUTPUT_FREQ_LOW_HZ +
+          INVERTER_OUTPUT_FREQ_HIGH_HZ) * 0.5f)) {
+        return INVERTER_LINE_VOLTAGE_TARGET_RMS_30HZ;
+    }
+
+    return INVERTER_LINE_VOLTAGE_TARGET_RMS_60HZ;
+}
+
+/**
+ * @brief 清除线电压整周期RMS累加器和慢速PI状态
+ */
+static void Inverter_Control_ResetLineVoltageRmsPI(void)
+{
+    inverter_line_voltage_rms_runtime =
+        (Inverter_LineVoltageRmsRuntimeTypeDef){0};
+
+    inverter_control_state.line_voltage_ab_rms_v = 0.0f;
+    inverter_control_state.line_voltage_bc_rms_v = 0.0f;
+    inverter_control_state.line_voltage_ca_rms_v = 0.0f;
+    inverter_control_state.line_voltage_feedback_rms_v = 0.0f;
+    inverter_control_state.line_voltage_imbalance_rms_v = 0.0f;
+    inverter_control_state.line_voltage_rms_error_v = 0.0f;
+    inverter_control_state.line_voltage_rms_pi_integral_v = 0.0f;
+    inverter_control_state.line_voltage_rms_pi_target_v = 0.0f;
+    inverter_control_state.line_voltage_rms_pi_correction_v = 0.0f;
+    inverter_control_state.line_voltage_rms_window_s = 0.0f;
+    inverter_control_state.line_voltage_rms_window_samples = 0U;
+    inverter_control_state.line_voltage_rms_ready = 0U;
+    inverter_control_state.line_voltage_rms_pi_active = 0U;
+    inverter_control_state.line_voltage_rms_pi_saturated = 0U;
+}
+
+/**
+ * @brief 在主循环按1ms采样、100ms计算线电压RMS并运行慢速PI
+ *
+ * @note 快速中断只负责原有控制和更新Uab/Ubc状态。本函数读取32位float
+ *       快照，不关中断、不使用double，也不向20kHz路径增加RMS乘加。
+ *       100ms窗口包含30Hz三周期或60Hz六周期。
+ */
+static void Inverter_Control_ProcessLineVoltageRmsPI(void)
+{
+    Inverter_LineVoltageRmsRuntimeTypeDef *rms;
+    float u_ab_v;
+    float u_bc_v;
+    float u_ca_v;
+    float sample_count_f;
+    float mean_ab_v;
+    float mean_bc_v;
+    float mean_ca_v;
+    float mean_square_ab_v2;
+    float mean_square_bc_v2;
+    float mean_square_ca_v2;
+    float rms_ab_v;
+    float rms_bc_v;
+    float rms_ca_v;
+    float rms_max_v;
+    float rms_min_v;
+    float error_v;
+    float integral_candidate_v;
+    float proportional_v;
+    float output_unclamped_v;
+    float output_v;
+    float correction_step_limit_v;
+    float correction_delta_v;
+    float window_s;
+    uint32_t current_tick_ms;
+    uint32_t window_elapsed_ms;
+    uint32_t sample_count;
+
+    if (inverter_control_state.enabled == 0U) {
+        return;
+    }
+
+    rms = &inverter_line_voltage_rms_runtime;
+    current_tick_ms = HAL_GetTick();
+
+    if (rms->tick_initialized == 0U) {
+        rms->last_sample_tick_ms = current_tick_ms;
+        rms->window_start_tick_ms = current_tick_ms;
+        rms->tick_initialized = 1U;
+        return;
+    }
+
+    if ((current_tick_ms - rms->last_sample_tick_ms) <
+        INVERTER_LINE_RMS_SAMPLE_PERIOD_MS) {
+        return;
+    }
+
+    rms->last_sample_tick_ms = current_tick_ms;
+
+    /* Cortex-M4上对齐的32位float读写是原子的，无需为快照关闭中断。 */
+    u_ab_v = inverter_control_state.u_ab_v;
+    u_bc_v = inverter_control_state.u_bc_v;
+    u_ca_v = -(u_ab_v + u_bc_v);
+
+    rms->sum_ab_v += u_ab_v;
+    rms->sum_bc_v += u_bc_v;
+    rms->sum_ca_v += u_ca_v;
+    rms->square_sum_ab_v2 += u_ab_v * u_ab_v;
+    rms->square_sum_bc_v2 += u_bc_v * u_bc_v;
+    rms->square_sum_ca_v2 += u_ca_v * u_ca_v;
+    rms->sample_count++;
+
+    if (rms->sample_count < INVERTER_LINE_RMS_WINDOW_SAMPLES) {
+        return;
+    }
+
+    sample_count = rms->sample_count;
+    sample_count_f = (float)sample_count;
+    mean_ab_v = rms->sum_ab_v / sample_count_f;
+    mean_bc_v = rms->sum_bc_v / sample_count_f;
+    mean_ca_v = rms->sum_ca_v / sample_count_f;
+
+    mean_square_ab_v2 =
+        rms->square_sum_ab_v2 / sample_count_f -
+        mean_ab_v * mean_ab_v;
+    mean_square_bc_v2 =
+        rms->square_sum_bc_v2 / sample_count_f -
+        mean_bc_v * mean_bc_v;
+    mean_square_ca_v2 =
+        rms->square_sum_ca_v2 / sample_count_f -
+        mean_ca_v * mean_ca_v;
+
+    mean_square_ab_v2 =
+        Inverter_Control_Clamp(mean_square_ab_v2, 0.0f, 1.0e9f);
+    mean_square_bc_v2 =
+        Inverter_Control_Clamp(mean_square_bc_v2, 0.0f, 1.0e9f);
+    mean_square_ca_v2 =
+        Inverter_Control_Clamp(mean_square_ca_v2, 0.0f, 1.0e9f);
+
+    rms_ab_v = sqrtf(mean_square_ab_v2);
+    rms_bc_v = sqrtf(mean_square_bc_v2);
+    rms_ca_v = sqrtf(mean_square_ca_v2);
+
+    inverter_control_state.line_voltage_ab_rms_v = rms_ab_v;
+    inverter_control_state.line_voltage_bc_rms_v = rms_bc_v;
+    inverter_control_state.line_voltage_ca_rms_v = rms_ca_v;
+    inverter_control_state.line_voltage_feedback_rms_v =
+        sqrtf((mean_square_ab_v2 +
+               mean_square_bc_v2 +
+               mean_square_ca_v2) / 3.0f);
+
+    rms_max_v = fmaxf(rms_ab_v, fmaxf(rms_bc_v, rms_ca_v));
+    rms_min_v = fminf(rms_ab_v, fminf(rms_bc_v, rms_ca_v));
+    inverter_control_state.line_voltage_imbalance_rms_v =
+        rms_max_v - rms_min_v;
+
+    window_elapsed_ms =
+        current_tick_ms - rms->window_start_tick_ms;
+    window_s = (float)window_elapsed_ms * 0.001f;
+    if (window_s <= 0.0f) {
+        window_s = 0.1f;
+    }
+    inverter_control_state.line_voltage_rms_window_s = window_s;
+    inverter_control_state.line_voltage_rms_window_samples =
+        sample_count;
+    inverter_control_state.line_voltage_rms_ready = 1U;
+
+    /* 保留1ms节拍状态，只清除已经消费的100ms统计窗口。 */
+    rms->sum_ab_v = 0.0f;
+    rms->sum_bc_v = 0.0f;
+    rms->sum_ca_v = 0.0f;
+    rms->square_sum_ab_v2 = 0.0f;
+    rms->square_sum_bc_v2 = 0.0f;
+    rms->square_sum_ca_v2 = 0.0f;
+    rms->sample_count = 0U;
+    rms->window_start_tick_ms = current_tick_ms;
+
+    error_v =
+        inverter_control_state.line_voltage_reference_rms_v -
+        inverter_control_state.line_voltage_feedback_rms_v;
+    inverter_control_state.line_voltage_rms_error_v = error_v;
+
+    /* 软启动未完成、非SVPWM或反馈异常时不改变幅值补偿。 */
+    if ((inverter_modulation_mode !=
+         INVERTER_MODULATION_MODE_SVPWM) ||
+        (inverter_control_state.line_voltage_reference_rms_v <
+         inverter_control_state.line_voltage_target_rms_v) ||
+        (inverter_control_state.line_voltage_feedback_rms_v <
+         INVERTER_LINE_RMS_PI_MIN_VALID_V) ||
+        (inverter_control_state.line_voltage_feedback_rms_v >
+         INVERTER_LINE_RMS_PI_MAX_VALID_V)) {
+        inverter_control_state.line_voltage_rms_pi_active = 0U;
+        inverter_control_state.line_voltage_rms_pi_saturated = 0U;
+        return;
+    }
+
+    inverter_control_state.line_voltage_rms_pi_active = 1U;
+    proportional_v = INVERTER_LINE_RMS_PI_KP * error_v;
+    integral_candidate_v =
+        inverter_control_state.line_voltage_rms_pi_integral_v +
+        INVERTER_LINE_RMS_PI_KI * error_v * window_s;
+    integral_candidate_v =
+        Inverter_Control_Clamp(
+            integral_candidate_v,
+            -INVERTER_LINE_RMS_PI_TRIM_LIMIT_V,
+            INVERTER_LINE_RMS_PI_TRIM_LIMIT_V);
+
+    /* SVPWM已过调制且电压仍偏低时，禁止积分项继续向上增长。 */
+    if ((inverter_svpwm_state.modulation_scale <
+         INVERTER_LINE_RMS_PI_MIN_MOD_SCALE) &&
+        (error_v > 0.0f)) {
+        integral_candidate_v =
+            inverter_control_state.line_voltage_rms_pi_integral_v;
+    }
+
+    output_unclamped_v = proportional_v + integral_candidate_v;
+    output_v =
+        Inverter_Control_Clamp(
+            output_unclamped_v,
+            -INVERTER_LINE_RMS_PI_TRIM_LIMIT_V,
+            INVERTER_LINE_RMS_PI_TRIM_LIMIT_V);
+
+    /* 条件积分抗饱和：误差能把输出拉回限幅区时才继续积分。 */
+    if ((output_v == output_unclamped_v) ||
+        ((output_unclamped_v >
+          INVERTER_LINE_RMS_PI_TRIM_LIMIT_V) &&
+         (error_v < 0.0f)) ||
+        ((output_unclamped_v <
+          -INVERTER_LINE_RMS_PI_TRIM_LIMIT_V) &&
+         (error_v > 0.0f))) {
+        inverter_control_state.line_voltage_rms_pi_integral_v =
+            integral_candidate_v;
+    }
+
+    output_unclamped_v =
+        proportional_v +
+        inverter_control_state.line_voltage_rms_pi_integral_v;
+    output_v =
+        Inverter_Control_Clamp(
+            output_unclamped_v,
+            -INVERTER_LINE_RMS_PI_TRIM_LIMIT_V,
+            INVERTER_LINE_RMS_PI_TRIM_LIMIT_V);
+
+    inverter_control_state.line_voltage_rms_pi_target_v =
+        output_v;
+
+    /* 在100ms后台周期内限速施加PI结果，不向20kHz中断添加斜坡运算。 */
+    correction_step_limit_v =
+        INVERTER_LINE_RMS_PI_SLEW_V_PER_S * window_s;
+    correction_delta_v =
+        inverter_control_state.line_voltage_rms_pi_target_v -
+        inverter_control_state.line_voltage_rms_pi_correction_v;
+    inverter_control_state.line_voltage_rms_pi_correction_v +=
+        Inverter_Control_Clamp(
+            correction_delta_v,
+            -correction_step_limit_v,
+            correction_step_limit_v);
+
+    inverter_control_state.line_voltage_rms_pi_saturated =
+        ((output_v != output_unclamped_v) ||
+         ((inverter_svpwm_state.modulation_scale <
+           INVERTER_LINE_RMS_PI_MIN_MOD_SCALE) &&
+          (error_v > 0.0f))) ? 1U : 0U;
 }
 
 /**
@@ -198,6 +479,9 @@ HAL_StatusTypeDef Inverter_Control_Init(void)
     inverter_control_last_status = HAL_OK;
     inverter_control_state.output_frequency_hz =
         INVERTER_OUTPUT_FREQ_DEFAULT_HZ;
+    inverter_control_state.line_voltage_target_rms_v =
+        Inverter_Control_SelectLineVoltageTargetRms(
+            inverter_control_state.output_frequency_hz);
     inverter_modulation_mode =
         INVERTER_MODULATION_MODE_DEFAULT;
 
@@ -274,6 +558,9 @@ HAL_StatusTypeDef Inverter_Control_SetOutputFrequency(
 
     inverter_control_state.output_frequency_hz =
         selected_frequency_hz;
+    inverter_control_state.line_voltage_target_rms_v =
+        Inverter_Control_SelectLineVoltageTargetRms(
+            selected_frequency_hz);
     Inverter_Control_ConfigurePRControllers(
         selected_frequency_hz);
     Inverter_Control_Reset();
@@ -326,6 +613,8 @@ void Inverter_Control_Reset(void)
         &inverter_control_state.current_pr_a);
     Inverter_PR_Reset(
         &inverter_control_state.current_pr_c);
+
+    Inverter_Control_ResetLineVoltageRmsPI();
 
     inverter_control_state.phase_rad = 0.0f;
     inverter_control_state.line_voltage_reference_rms_v = 0.0f;
@@ -405,6 +694,9 @@ void Inverter_Control_Service(float dc_bus_v)
         }
     }
 
+    /* sqrtf和慢速PI只在主循环运行，不占用20kHz ADC/PWM快速中断。 */
+    Inverter_Control_ProcessLineVoltageRmsPI();
+
     if (inverter_stop_request != 0U) {
         inverter_stop_request = 0U;
         inverter_start_request = 0U;
@@ -454,6 +746,10 @@ void Inverter_Control_Update(float u_ab_v,
                              float dc_bus_v)
 {
     float phase_peak_v;
+    float line_voltage_command_rms_v;
+    float u_ca_reference_v;
+    float ac_balance_gain;
+    float ac_balance_v;
     float voltage_error_a;
     float voltage_error_c;
     float current_error_a;
@@ -498,26 +794,86 @@ void Inverter_Control_Update(float u_ab_v,
         INVERTER_LINE_VOLTAGE_SLEW_V_PER_S /
         INVERTER_CONTROL_FREQ_HZ;
     if (inverter_control_state.line_voltage_reference_rms_v >
-        INVERTER_LINE_VOLTAGE_TARGET_RMS_V) {
+        inverter_control_state.line_voltage_target_rms_v) {
         inverter_control_state.line_voltage_reference_rms_v =
-            INVERTER_LINE_VOLTAGE_TARGET_RMS_V;
+            inverter_control_state.line_voltage_target_rms_v;
     }
 
+    /* RMS PI补偿已在后台限幅；快速路径只比原版增加一次浮点加法。 */
+    line_voltage_command_rms_v =
+        inverter_control_state.line_voltage_reference_rms_v +
+        inverter_control_state.line_voltage_rms_pi_correction_v;
     phase_peak_v =
-        inverter_control_state.line_voltage_reference_rms_v *
+        line_voltage_command_rms_v *
         INVERTER_LINE_RMS_TO_PHASE_PEAK;
 
+    /*
+ * 首先生成未补偿的A、C相参考电压。
+ */
     inverter_control_state.v_a_reference_v =
         phase_peak_v *
         sinf(inverter_control_state.phase_rad);
+
     /* ABC正序：B滞后A 120°，C超前A 120°。 */
     inverter_control_state.v_c_reference_v =
         phase_peak_v *
         sinf(inverter_control_state.phase_rad +
              INVERTER_TWO_PI_OVER_THREE);
+
+    /*
+     * 计算原始Uca参考：
+     *
+     * Uca = Vc - Va
+     *
+     * AC与CA方向相反，但两者RMS大小相同。
+     */
+    u_ca_reference_v =
+        inverter_control_state.v_c_reference_v -
+        inverter_control_state.v_a_reference_v;
+
+    /* 根据当前30Hz/60Hz输出频率选择对应的AC/CA补偿系数。 */
+    if (inverter_control_state.output_frequency_hz <
+        ((INVERTER_OUTPUT_FREQ_LOW_HZ +
+          INVERTER_OUTPUT_FREQ_HIGH_HZ) * 0.5f)) {
+        ac_balance_gain =
+            INVERTER_AC_BALANCE_GAIN_30HZ;
+    } else {
+        ac_balance_gain =
+            INVERTER_AC_BALANCE_GAIN_60HZ;
+    }
+
+    /* 正补偿使Va和Vc互相靠近，从而降低AC/CA线电压。 */
+    ac_balance_v =
+        0.5f *
+        ac_balance_gain *
+        u_ca_reference_v;
+
+    inverter_control_state.v_a_reference_v +=
+        ac_balance_v;
+
+    inverter_control_state.v_c_reference_v -=
+        ac_balance_v;
+
+    /*
+     * A、C补偿完成后再重构B相，保证：
+     *
+     * Va + Vb + Vc = 0
+     */
     inverter_control_state.v_b_reference_v =
         -inverter_control_state.v_a_reference_v -
         inverter_control_state.v_c_reference_v;
+
+    // inverter_control_state.v_a_reference_v =
+    //     phase_peak_v *
+    //     sinf(inverter_control_state.phase_rad);
+    // /* ABC正序：B滞后A 120°，C超前A 120°。 */
+    // inverter_control_state.v_c_reference_v =
+    //     phase_peak_v *
+    //     sinf(inverter_control_state.phase_rad +
+    //          INVERTER_TWO_PI_OVER_THREE);
+    // inverter_control_state.v_b_reference_v =
+    //     -inverter_control_state.v_a_reference_v -
+    //     inverter_control_state.v_c_reference_v;
 
     voltage_error_a =
         inverter_control_state.v_a_reference_v -

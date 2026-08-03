@@ -1,5 +1,4 @@
 #include "inverter_adc.h"
-#include "inverter_adc_watchdog.h"
 #include "inverter_control.h"
 #include "pfc_adc.h"
 
@@ -9,12 +8,73 @@ volatile Inverter_ADC_StateTypeDef inverter_adc_state;
 /** ADC1六Rank循环DMA缓冲区首地址。 */
 static const volatile uint16_t *inverter_adc1_dma_buffer;
 
+/** 三相逆变四路一次性上电零点校准过程。 */
+typedef struct
+{
+    uint32_t discard_count;
+    uint32_t sample_count;
+    uint32_t voltage_1_zero_sum;
+    uint32_t voltage_2_zero_sum;
+    uint32_t current_1_zero_sum;
+    uint32_t current_2_zero_sum;
+} Inverter_ADC_ZeroCalibrationWorkTypeDef;
+
+/** 三相逆变四路一次性上电零点校准过程数据。 */
+static Inverter_ADC_ZeroCalibrationWorkTypeDef
+    inverter_adc_zero_calibration_work;
+
 /**
- * @brief          初始化三相逆变的 ADC 采样及过流保护
+ * @brief          累加一次四路同步采样并在样本足够时计算零点
+ * @retval         none
+ */
+static void Inverter_ADC_ProcessZeroCalibration(
+    uint16_t voltage_1_raw,
+    uint16_t voltage_2_raw,
+    uint16_t current_1_raw,
+    uint16_t current_2_raw)
+{
+    Inverter_ADC_ZeroCalibrationWorkTypeDef *calibration;
+
+    calibration = &inverter_adc_zero_calibration_work;
+
+    if (calibration->discard_count <
+        INVERTER_ADC_ZERO_CALIB_DISCARD_SAMPLES) {
+        calibration->discard_count++;
+        return;
+    }
+
+    calibration->voltage_1_zero_sum += voltage_1_raw;
+    calibration->voltage_2_zero_sum += voltage_2_raw;
+    calibration->current_1_zero_sum += current_1_raw;
+    calibration->current_2_zero_sum += current_2_raw;
+    calibration->sample_count++;
+
+    if (calibration->sample_count >=
+        INVERTER_ADC_ZERO_CALIB_SAMPLES) {
+        inverter_adc_state.zero_calibration.voltage_1_zero_count =
+            (float)calibration->voltage_1_zero_sum /
+            (float)calibration->sample_count;
+        inverter_adc_state.zero_calibration.voltage_2_zero_count =
+            (float)calibration->voltage_2_zero_sum /
+            (float)calibration->sample_count;
+        inverter_adc_state.zero_calibration.current_1_zero_count =
+            (float)calibration->current_1_zero_sum /
+            (float)calibration->sample_count;
+        inverter_adc_state.zero_calibration.current_2_zero_count =
+            (float)calibration->current_2_zero_sum /
+            (float)calibration->sample_count;
+
+        /* 四个零点全部写完后再置位，主循环此后才能使用结果。 */
+        inverter_adc_state.zero_calibration.ready = 1U;
+    }
+}
+
+/**
+ * @brief          初始化并启动三相逆变ADC采样
  * @param[in]      adc1_dma_buffer ADC1 DMA 缓冲区地址，
  *                                 与 PFC 采样共用同一个 ADC1 DMA 缓冲区
  * @retval         HAL_OK    初始化并启动成功
- * @retval         HAL_ERROR ADC、模拟看门狗或 DMA 启动失败
+ * @retval         HAL_ERROR ADC或DMA启动失败
  * @note           必须在 MX_DMA_Init()、MX_ADC1_Init()、
  *                 MX_ADC2_Init() 和 MX_HRTIM1_Init() 执行完成后调用
  */
@@ -23,11 +83,6 @@ HAL_StatusTypeDef Inverter_App_Init(
 {
     /* 绑定 ADC1 DMA 缓冲区，并初始化三相逆变采样状态。 */
     if (Inverter_ADC_Init(adc1_dma_buffer) != HAL_OK) {
-        return HAL_ERROR;
-    }
-
-    /* 配置并启用 ADC2 模拟看门狗，用于两路逆变电流过流保护。 */
-    if (Inverter_ADC_Watchdog_Init() != HAL_OK) {
         return HAL_ERROR;
     }
 
@@ -58,7 +113,15 @@ HAL_StatusTypeDef Inverter_ADC_Init(
     inverter_adc_state =
         (Inverter_ADC_StateTypeDef){0};
 
+    inverter_adc_zero_calibration_work =
+        (Inverter_ADC_ZeroCalibrationWorkTypeDef){0};
+
     inverter_adc1_dma_buffer = adc1_dma_buffer;
+
+    /* 校准完成并写入动态阈值前，禁止ADC2电流看门狗中断。 */
+    __HAL_ADC_DISABLE_IT(&hadc2, ADC_IT_AWD1);
+    CLEAR_BIT(hadc2.State, HAL_ADC_STATE_AWD1);
+    __HAL_ADC_CLEAR_FLAG(&hadc2, ADC_FLAG_AWD1);
 
     return HAL_OK;
 }
@@ -118,6 +181,28 @@ HAL_StatusTypeDef Inverter_ADC_Start(void)
 }
 
 /**
+ * @brief          等待v1、v2、a1、a2上电零点校准完成
+ * @param[in]      timeout_ms 最长等待时间，单位为ms
+ * @retval         HAL_OK 四路零点校准完成
+ * @retval         HAL_TIMEOUT 等待超时
+ */
+HAL_StatusTypeDef Inverter_ADC_WaitForZeroCalibration(
+    uint32_t timeout_ms)
+{
+    uint32_t start_tick;
+
+    start_tick = HAL_GetTick();
+
+    while (inverter_adc_state.zero_calibration.ready == 0U) {
+        if ((HAL_GetTick() - start_tick) >= timeout_ms) {
+            return HAL_TIMEOUT;
+        }
+    }
+
+    return HAL_OK;
+}
+
+/**
  * @brief          停止ADC2循环DMA采样
  * @param[in]      none
  * @retval         HAL_StatusTypeDef HAL执行状态
@@ -172,26 +257,36 @@ void Inverter_ADC_ProcessFullTransfer(void)
     inverter_adc_state.raw.current_1 = current_1_raw;
     inverter_adc_state.raw.current_2 = current_2_raw;
 
-    /* 根据固定偏置和手动标定倍率换算两路逆变电压。 */
+    /* 校准期间只累加四路零点，不换算物理量，也不运行逆变闭环。 */
+    if (inverter_adc_state.zero_calibration.ready == 0U) {
+        Inverter_ADC_ProcessZeroCalibration(
+            voltage_1_raw,
+            voltage_2_raw,
+            current_1_raw,
+            current_2_raw);
+        return;
+    }
+
+    /* 根据上电校准零点和手动标定倍率换算两路逆变电压。 */
     inverter_adc_state.measurement.voltage_1_v =
         ((float)voltage_1_raw -
-         INVERTER_ADC_VOLTAGE_1_OFFSET_COUNT) *
+         inverter_adc_state.zero_calibration.voltage_1_zero_count) *
         INVERTER_ADC_VOLTAGE_1_V_PER_COUNT;
 
     inverter_adc_state.measurement.voltage_2_v =
         ((float)voltage_2_raw -
-         INVERTER_ADC_VOLTAGE_2_OFFSET_COUNT) *
+         inverter_adc_state.zero_calibration.voltage_2_zero_count) *
         INVERTER_ADC_VOLTAGE_2_V_PER_COUNT;
 
-    /* 根据固定偏置和手动标定增益换算两路逆变电流。 */
+    /* 根据上电校准零点和手动标定增益换算两路逆变电流。 */
     inverter_adc_state.measurement.current_1_a =
         ((float)current_1_raw -
-         INVERTER_ADC_CURRENT_1_OFFSET_COUNT) *
+         inverter_adc_state.zero_calibration.current_1_zero_count) *
         INVERTER_ADC_CURRENT_1_A_PER_COUNT;
 
     inverter_adc_state.measurement.current_2_a =
         ((float)current_2_raw -
-         INVERTER_ADC_CURRENT_2_OFFSET_COUNT) *
+         inverter_adc_state.zero_calibration.current_2_zero_count) *
         INVERTER_ADC_CURRENT_2_A_PER_COUNT;
 
     inverter_adc_state.update_count++;

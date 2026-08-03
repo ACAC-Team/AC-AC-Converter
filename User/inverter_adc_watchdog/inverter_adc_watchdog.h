@@ -20,16 +20,16 @@
 typedef struct
 {
     uint16_t current_1_low_count;
-    /**< 第一路电流按自身偏置和增益计算的下限。 */
+    /**< 第一路电流按自身校准零点和增益计算的下限。 */
 
     uint16_t current_1_high_count;
-    /**< 第一路电流按自身偏置和增益计算的上限。 */
+    /**< 第一路电流按自身校准零点和增益计算的上限。 */
 
     uint16_t current_2_low_count;
-    /**< 第二路电流按自身偏置和增益计算的下限。 */
+    /**< 第二路电流按自身校准零点和增益计算的下限。 */
 
     uint16_t current_2_high_count;
-    /**< 第二路电流按自身偏置和增益计算的上限。 */
+    /**< 第二路电流按自身校准零点和增益计算的上限。 */
 
     uint16_t common_low_count;
     /**< ADC2 AWD1实际写入的公共窗口下限。 */
@@ -49,13 +49,15 @@ extern volatile Inverter_ADC_WatchdogStateTypeDef
     inverter_adc_watchdog_state;
 
 /**
- * @brief          根据偏置、增益和电流上限配置ADC2 AWD1实际阈值
+ * @brief          根据校准零点、增益和电流上限配置ADC2 AWD1实际阈值
  * @param[in]      none
  * @retval         HAL_OK 配置成功
  * @retval         HAL_ERROR 两路安全窗口没有公共交集
  *
  * @note           IOC必须配置：ADC2 AWD1、ALL_REG、IT使能、0~4095初始窗口。
  * @note           本函数不启动ADC2，不执行ADC内部自动校准。
+ * @note           必须在三相逆变四路上电零点校准完成后调用。
+ * @note           调用前必须先停止ADC2 DMA，写入阈值后再重新启动ADC2。
  */
 HAL_StatusTypeDef Inverter_ADC_Watchdog_Init(void);
 

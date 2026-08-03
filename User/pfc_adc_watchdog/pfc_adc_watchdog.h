@@ -15,6 +15,15 @@
 extern volatile uint32_t pfc_adc_fault; /**< PFC ADC故障锁存标志。 */
 
 /**
+* @brief          关闭并清除ADC1全部硬件看门狗中断状态
+* @param[in]      none
+* @retval         none
+*
+* @note           仅用于功率输出关闭的启动采样和零点校准阶段。
+*/
+void PFC_ADC_Watchdog_Disable(void);
+
+/**
 * @brief          配置PFC输入过流和母线过压ADC硬件看门狗
 * @param[in]      none
 * @retval         HAL_StatusTypeDef HAL执行状态

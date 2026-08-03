@@ -105,7 +105,7 @@ HAL_StatusTypeDef Inverter_DPWM_Init(void);
  * @brief          启动Timer A/B/C计数器，但不使能六路功率输出
  * @retval         HAL_StatusTypeDef HAL执行状态
  *
- * @note           必须在PFC_App_Init()启动HRTIM Master之后调用。
+ * @note           必须在HRTIM Master采样时基启动之后调用。
  */
 HAL_StatusTypeDef Inverter_DPWM_StartCounters(void);
 

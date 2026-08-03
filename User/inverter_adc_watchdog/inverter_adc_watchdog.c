@@ -51,7 +51,7 @@ static void Inverter_ADC_Watchdog_TripFromISR(
 }
 
 /**
- * @brief          根据偏置、增益和电流上限配置ADC2 AWD1实际阈值
+ * @brief          根据校准零点、增益和电流上限配置ADC2 AWD1实际阈值
  * @param[in]      none
  * @retval         HAL_StatusTypeDef HAL执行状态
  */
@@ -66,6 +66,10 @@ HAL_StatusTypeDef Inverter_ADC_Watchdog_Init(void)
     uint16_t common_low;
     uint16_t common_high;
 
+    if (inverter_adc_state.zero_calibration.ready == 0U) {
+        return HAL_ERROR;
+    }
+
     /*
      * ADC2 AWD1在IOC中配置为ALL_REG，因此ADC2_IN3和ADC2_IN4
      * 共用TR1中的一组上下限。先分别计算两路安全窗口。
@@ -79,19 +83,19 @@ HAL_StatusTypeDef Inverter_ADC_Watchdog_Init(void)
         INVERTER_ADC_CURRENT_2_A_PER_COUNT;
 
     low_1 = Inverter_ADC_ClampCount(
-        INVERTER_ADC_CURRENT_1_OFFSET_COUNT -
+        inverter_adc_state.zero_calibration.current_1_zero_count -
         limit_count_1);
 
     high_1 = Inverter_ADC_ClampCount(
-        INVERTER_ADC_CURRENT_1_OFFSET_COUNT +
+        inverter_adc_state.zero_calibration.current_1_zero_count +
         limit_count_1);
 
     low_2 = Inverter_ADC_ClampCount(
-        INVERTER_ADC_CURRENT_2_OFFSET_COUNT -
+        inverter_adc_state.zero_calibration.current_2_zero_count -
         limit_count_2);
 
     high_2 = Inverter_ADC_ClampCount(
-        INVERTER_ADC_CURRENT_2_OFFSET_COUNT +
+        inverter_adc_state.zero_calibration.current_2_zero_count +
         limit_count_2);
 
     /*

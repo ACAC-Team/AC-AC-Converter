@@ -14,8 +14,8 @@
 #define PFC_ADC_VIN_SCALE        60.92f   /**< PFC输入电压采样模块的还原倍率。 */
 #define PFC_ADC_IIN_GAIN_V_PER_A 0.08334f /**< PFC输入电流采样增益，单位为V/A。 */
 #define PFC_ADC_VBUS_SCALE       29.7f   /**< 直流母线电压采样模块的校准还原倍率。 */
-#define PFC_ADC_VIN_OFFSET_V     1.7524f    /**< PFC输入电压采样通道的偏置电压，单位为V。 */
-#define PFC_ADC_IIN_OFFSET_V     1.6786f    /**< PFC输入电流采样通道的偏置电压，单位为V。 */
+#define PFC_ADC_VIN_OFFSET_V     1.721f    /**< PFC输入电压采样通道的偏置电压，单位为V。 */
+#define PFC_ADC_IIN_OFFSET_V     1.645f    /**< PFC输入电流采样通道的偏置电压，单位为V。 */
 #define PFC_ADC_VBUS_OFFSET_V    0.0f     /**< PFC直流母线电压采样通道的偏置电压，单位为V。 */
 #define PFC_ADC_SAMPLE_FREQ_HZ   20000.0f /**< HRTIM触发ADC1规则组的采样频率，单位为Hz。 */
 #define PFC_ADC_VBUS_LPF_HZ      500.0f   /**< 直流母线一阶低通滤波截止频率，单位为Hz。 */

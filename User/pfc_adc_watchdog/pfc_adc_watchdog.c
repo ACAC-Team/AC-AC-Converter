@@ -36,6 +36,29 @@ static void TripFromISR(uint32_t fault)
     pfc_adc_fault |= fault;
 }
 ADC_AnalogWDGConfTypeDef watchdog = {0};
+
+/**
+* @brief          关闭并清除ADC1全部硬件看门狗中断状态
+* @param[in]      none
+* @retval         none
+*/
+void PFC_ADC_Watchdog_Disable(void)
+{
+    __HAL_ADC_DISABLE_IT(
+        &hadc1,
+        ADC_IT_AWD1 | ADC_IT_AWD2 | ADC_IT_AWD3);
+
+    CLEAR_BIT(
+        hadc1.State,
+        HAL_ADC_STATE_AWD1 |
+        HAL_ADC_STATE_AWD2 |
+        HAL_ADC_STATE_AWD3);
+
+    __HAL_ADC_CLEAR_FLAG(
+        &hadc1,
+        ADC_FLAG_AWD1 | ADC_FLAG_AWD2 | ADC_FLAG_AWD3);
+}
+
 /**
 * @brief          配置PFC输入过流和母线过压ADC硬件看门狗
 * @param[in]      none
