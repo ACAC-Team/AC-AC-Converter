@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 #include "main.h"
-#include "inverter_dpwm.h"
 
 /* ==================== 基本控制参数 ==================== */
 
@@ -11,14 +10,14 @@
 #define INVERTER_CONTROL_FREQ_HZ              20000.0f
 
 /** 题目要求的低输出频率，单位为Hz。 */
-#define INVERTER_OUTPUT_FREQ_LOW_HZ           30.0f//35.55f
+#define INVERTER_OUTPUT_FREQ_LOW_HZ           30.0f
 
 /** 题目要求的高输出频率，单位为Hz。 */
-#define INVERTER_OUTPUT_FREQ_HIGH_HZ          60.0f//70.5f
+#define INVERTER_OUTPUT_FREQ_HIGH_HZ          60.0f
 
 /** 上电默认输出频率，默认使用低频。 */
 #define INVERTER_OUTPUT_FREQ_DEFAULT_HZ       \
-    INVERTER_OUTPUT_FREQ_LOW_HZ
+        INVERTER_OUTPUT_FREQ_HIGH_HZ
 
 /** 30Hz时用于得到32V实际输出的内部线电压RMS指令。 */
 #define INVERTER_LINE_VOLTAGE_TARGET_RMS_30HZ  31.95f
@@ -87,10 +86,10 @@
 /* ==================== 电压PR外环参数 ==================== */
 
 /** 电压PR外环比例增益，输出单位为A。 */
-#define INVERTER_VOLTAGE_PR_KP                0.05 //0.050f
+#define INVERTER_VOLTAGE_PR_KP                0.05f
 
 /** 电压PR外环谐振增益，输出单位为A。 */
-#define INVERTER_VOLTAGE_PR_KR                10.0f//10.0f
+#define INVERTER_VOLTAGE_PR_KR                10.0f
 
 /** 电压PR外环谐振带宽，单位为rad/s。 */
 #define INVERTER_VOLTAGE_PR_WC_RAD_S          1.0f
@@ -105,10 +104,10 @@
 /* ==================== 电流PR内环参数 ==================== */
 
 /** 电流PR内环比例增益，输出单位为V。 */
-#define INVERTER_CURRENT_PR_KP                -2.0f//-2.0f
+#define INVERTER_CURRENT_PR_KP                -2.0f
 
 /** 电流PR内环谐振增益，输出单位为V。 */
-#define INVERTER_CURRENT_PR_KR                -80.0f//-80.0f
+#define INVERTER_CURRENT_PR_KR                -80.0f
 
 /** 电流PR内环谐振带宽，单位为rad/s。 */
 #define INVERTER_CURRENT_PR_WC_RAD_S          5.0f
@@ -213,9 +212,9 @@ extern volatile uint8_t inverter_stop_request;
 extern volatile HAL_StatusTypeDef inverter_control_last_status;
 
 /**
- * @brief          初始化双PR、DPWM和Timer A/B/C计数器
+ * @brief          初始化双PR、SVPWM和Timer A/B/C计数器
  * @retval         HAL_OK 初始化成功，六路功率输出保持关闭
- * @retval         其他HAL状态 DPWM初始化或计数器启动失败
+ * @retval         其他HAL状态 SVPWM初始化或计数器启动失败
  *
  * @note           必须在HRTIM Master采样时基启动之后调用。
  */
@@ -243,7 +242,7 @@ HAL_StatusTypeDef Inverter_Control_SetOutputFrequency(
 void Inverter_Control_Service(float dc_bus_v);
 
 /**
- * @brief          在ADC1全传输回调中执行一次双PR闭环和DPWM更新
+ * @brief          在ADC1全传输回调中执行一次双PR闭环和SVPWM更新
  * @param[in]      u_ab_v 采样线电压Uab
  * @param[in]      u_bc_v 采样线电压Ubc
  * @param[in]      i_a_a 采样A相线电流

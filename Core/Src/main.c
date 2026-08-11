@@ -36,6 +36,7 @@
 #include "inverter_adc.h"
 #include "inverter_adc_watchdog.h"
 #include "inverter_control.h"
+#include "inverter_svpwm.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -196,7 +197,7 @@ int main(void)
   HAL_Delay(2000);
 
   /* 任何ADC采样和校准开始前，先强制关闭三相逆变六路功率输出。 */
-  Inverter_DPWM_Disable();
+  Inverter_SVPWM_Disable();
 
   if (Inverter_App_Init(pfc_adc_state.dma.sample) != HAL_OK) {
     Error_Handler();
