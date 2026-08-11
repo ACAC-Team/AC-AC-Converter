@@ -19,7 +19,7 @@ Three-phase AC-AC converter based on SPWM control for National Undergraduate Ele
 
 系统采用：
 
-- AC-DC整流
+- AC-DC无桥PWM整流
 - DC-Link母线
 - 三相逆变桥
 - SPWM调制控制
