@@ -4,7 +4,6 @@
 #include <stdint.h>
 #include "adc.h"
 #include "inverter_adc.h"
-
 /** 两路逆变电流允许的绝对值上限，单位为A。 */
 #define INVERTER_ADC_CURRENT_LIMIT_A          8.0f
 

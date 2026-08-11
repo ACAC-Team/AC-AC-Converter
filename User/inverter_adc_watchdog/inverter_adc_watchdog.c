@@ -1,6 +1,5 @@
 #include "inverter_adc_watchdog.h"
 #include "hrtim.h"
-
 /** 三相逆变HRTIM Timer A、B、C六路输出位掩码。 */
 #define INVERTER_PWM_OUTPUTS \
     (HRTIM_OUTPUT_TA1 | HRTIM_OUTPUT_TA2 | \

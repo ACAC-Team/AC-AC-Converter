@@ -1,7 +1,6 @@
 #include "inverter_adc.h"
 #include "inverter_control.h"
 #include "pfc_adc.h"
-
 /** 三相逆变ADC采样对外运行数据。 */
 volatile Inverter_ADC_StateTypeDef inverter_adc_state;
 

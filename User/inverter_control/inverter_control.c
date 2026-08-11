@@ -4,7 +4,6 @@
 
 #include "inverter_adc_watchdog.h"
 #include "inverter_svpwm.h"
-
 /** 三相逆变控制运行状态，可在调试器中观察。 */
 volatile Inverter_Control_StateTypeDef
     inverter_control_state;

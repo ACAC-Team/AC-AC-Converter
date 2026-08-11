@@ -1,5 +1,4 @@
 #include "inverter_svpwm.h"
-
 /** SVPWM运行状态，可在调试器中观察。 */
 volatile Inverter_SVPWM_StateTypeDef inverter_svpwm_state;
 
