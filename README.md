@@ -53,3 +53,203 @@ Three-phase AC-AC converter based on SPWM control for National Undergraduate Ele
 
 
 系统主要由以下模块组成：
+Single-phase AC Input
+
+    ↓
+
+Rectifier Circuit
+
+    ↓
+
+DC-Link
+
+    ↓
+
+Three-phase Inverter Bridge
+
+    ↓
+
+LC Filter
+
+    ↓
+
+Three-phase AC Output
+
+
+
+---
+
+# 🔧 Hardware Design
+
+
+## 1. Power Stage
+
+主要设计内容：
+
+- 整流电路设计
+- DC母线电容选型
+- MOSFET逆变桥设计
+- 功率器件散热设计
+
+
+<p align="center">
+<img src="./Images/power_board.jpg" width="500">
+</p>
+
+
+---
+
+## 2. Gate Driver Circuit
+
+设计内容：
+
+- MOSFET驱动电路
+- 上下桥臂隔离驱动
+- 死区时间控制
+
+
+---
+
+## 3. Output Filter
+
+设计LC滤波网络：
+
+- 降低PWM高频谐波
+- 提高输出电压波形质量
+
+
+---
+
+# 💻 Software Design
+
+
+## Control Algorithm
+
+基于MCU实现：
+
+- SPWM波形生成
+- 三相相位控制
+- 输出频率调节
+- PWM占空比控制
+- 系统保护逻辑
+
+
+程序结构：
+
+
+Main Loop
+
+├── PWM Initialization
+
+├── SPWM Generate
+
+├── ADC Sampling
+
+├── Protection Check
+
+└── Output Control
+
+
+
+---
+
+# 📊 Test Result
+
+
+## Output Waveform
+
+
+<p align="center">
+<img src="./Images/output_waveform.png" width="600">
+</p>
+
+
+测试结果：
+
+| Test Item | Result |
+| :-- | :-- |
+| Output Voltage | 32V |
+| Frequency | 60Hz |
+| Load Current | 2A |
+| THD | <2% |
+| Efficiency | >95% |
+
+
+---
+
+# 🛠 Development Tools
+
+
+## Hardware
+
+- STM32 MCU
+- MOSFET Power Stage
+- Gate Driver IC
+- Current/Voltage Sampling Circuit
+
+
+## Software
+
+- STM32CubeIDE
+- Keil MDK
+- Altium Designer
+- MATLAB/Simulink
+
+
+---
+
+# 👨‍💻 Team Contribution
+
+
+## My Responsibility
+
+负责：
+
+- 功率主电路设计
+- PCB Layout
+- MOSFET驱动设计
+- 控制程序开发
+- 系统调试与测试
+
+
+Team:
+
+| Member | Responsibility |
+|-|-|
+| Member A | Hardware Design |
+| Member B | Software Development |
+| Member C | Testing & Documentation |
+
+
+---
+
+# 📷 Prototype
+
+
+<p align="center">
+<img src="./Images/prototype.jpg" width="700">
+</p>
+
+
+---
+
+# 📚 Project Background
+
+Competition:
+
+2026 National Undergraduate Electronic Design Contest
+
+Topic:
+
+A - AC-AC Converter
+
+
+---
+
+# ⭐ Highlights
+
+- Complete power electronic system design
+- Three-phase inverter implementation
+- SPWM control algorithm
+- Hardware prototype verification
+- Engineering testing process
