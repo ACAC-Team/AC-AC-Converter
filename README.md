@@ -38,7 +38,7 @@ Three-phase AC-AC converter based on SPWM control for National Undergraduate Ele
 | Input Frequency | 50Hz |
 | Output Voltage | 32V Line Voltage |
 | Output Frequency | 30Hz / 60Hz Adjustable |
-| Load Current | 2A |
+| Load Current | 3A |
 | Output Type | Three-phase AC |
 
 
