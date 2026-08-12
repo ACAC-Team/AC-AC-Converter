@@ -358,7 +358,7 @@ flowchart LR
 ![UCC21520驱动电路](./Images/hardware/驱动ucc21520.png)
 
 每只功率场效应管的栅极串联 10 欧电阻，并设置 10 千欧栅源下拉电阻。驱动器和定时器均配置死区，最终有效死区应以实际栅极波形为准，避免简单叠加软件与驱动器的标称死区。
-
+![UCC21520驱动实物](./Images/hardware/IMG20260719220426.jpg)
 ![功率域、采样域与驱动域隔离关系](./Images/hardware/isolation_domains.png)
 
 ## 五、电压与电流采样
