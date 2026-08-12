@@ -114,7 +114,7 @@ PFC_CONTROL_MODE_PFC
 /**
  * 电压环相对电流环的分频系数。
  *
- * @note 20kHz控制频率、分频20时，电压环执行频率为1kHz。
+ * @note 10kHz控制频率、分频10时，电压环执行频率为1kHz。
  */
 #define PFC_VOLTAGE_LOOP_DIVIDER 1U
 
