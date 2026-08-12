@@ -328,7 +328,6 @@ flowchart LR
     MCU --> PFC
     MCU --> INV
 ```
-![系统硬件结构](./Images/hardware/system_hardware_block.png)
 
 ## 一、前级功率因数校正主电路
 
