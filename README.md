@@ -316,7 +316,18 @@ DMA 搬运并锁存采样值
 # 硬件设计
 
 硬件采用“无桥功率因数校正整流、60 伏直流母线、三相两电平逆变、三相滤波”的两级结构，由 STM32G474RBT6 统一完成采样、控制和脉宽调制。系统功率等级按 32 伏线电压、2 安线电流设计，三相负载采用星形连接，额定输出有功功率约为 111 瓦。
-
+```mermaid
+flowchart LR
+    IN[31～41 V / 50 Hz 单相交流] --> EMI[输入差模滤波]
+    EMI --> PFC[四开关无桥 PFC<br/>20 kHz]
+    PFC --> BUS[60 V 直流母线<br/>4880 μF]
+    BUS --> INV[三相两电平逆变器<br/>SVPWM / 20 kHz]
+    INV --> LC[三相 LC 滤波]
+    LC --> OUT[32 V 线电压<br/>30 Hz / 60 Hz]
+    SENSE[电压、电流采样] --> MCU[STM32G474RBT6]
+    MCU --> PFC
+    MCU --> INV
+```
 ![系统硬件结构](./Images/hardware/system_hardware_block.png)
 
 ## 一、前级功率因数校正主电路
